@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
+from einops import rearrange
 from run_config import RunConfig
 
 import gymnasium as gym
@@ -75,8 +76,8 @@ class PPOAgent(Agent):
         reward: float,
     ) -> None:
         # Calculate the advantage
-        state_tensor = torch.FloatTensor(state).unsqueeze(0)
-        next_state_tensor = torch.FloatTensor(next_state).unsqueeze(0)
+        state_tensor = rearrange(torch.FloatTensor(state), "... -> 1 ...")
+        next_state_tensor = rearrange(torch.FloatTensor(next_state), "... -> 1 ...")
         reward_tensor = torch.FloatTensor([reward])
 
         # Get current action probabilities

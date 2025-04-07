@@ -8,7 +8,7 @@ import numpy as np
 import gymnasium as gym
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
 @dataclass
@@ -18,7 +18,7 @@ class RunConfig:
     num_episodes: int
     num_steps: int
     seed: Optional[int] = None
-    render: bool = False
+    render: Literal["rgb_array", "human", None] = None
 
 
 class Agent(ABC):
@@ -58,9 +58,7 @@ class RandomAgent(Agent):
 
 def get_env(run_config: RunConfig):
     if run_config.env_name == "CartPole-v1":
-        return gym.make(
-            "CartPole-v1", render_mode="rgb_array" if run_config.render else None
-        )
+        return gym.make("CartPole-v1", render_mode=run_config.render)
     # elif run_config.env_name == "MountainCar-v0":
     #     return gym.make("MountainCar-v0")
     # elif run_config.env_name == "Pendulum-v1":
@@ -103,7 +101,7 @@ def run_experiment(run_config: RunConfig):
 def main():
     run_config = RunConfig(
         env_name="CartPole-v1",
-        render=True,
+        render="human",
         agent_name="random",
         num_episodes=10,
         num_steps=1000,

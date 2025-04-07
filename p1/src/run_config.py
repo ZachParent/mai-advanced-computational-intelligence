@@ -4,6 +4,8 @@ from typing import Literal, Optional
 
 @dataclass
 class RunConfig:
+    id: int
+    name: str
     env_name: Literal["CartPole-v1"]
     agent_name: Literal["random"]
     num_episodes: int

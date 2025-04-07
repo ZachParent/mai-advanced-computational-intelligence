@@ -1,12 +1,42 @@
 import logging
 
+import numpy as np
+import pandas as pd
 from agent import Agent, get_agent
+from config import RESULTS_DIR
 from run_config import RunConfig
+from tqdm import tqdm
 
 import gymnasium as gym
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+
+class MetricsLogger:
+    def __init__(self, run_config: RunConfig):
+        self.run_config = run_config
+        self.episode_rewards = []
+        self.progress_bar = tqdm(total=run_config.num_episodes, desc="Running episodes")
+        RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    def init_episode(self):
+        self.episode_rewards.append(0)
+
+    def end_episode(self):
+        self.progress_bar.update(1)
+        self.progress_bar.desc = f"Reward: {np.mean(self.episode_rewards)}"
+
+    def update(self, reward: float):
+        self.episode_rewards[-1] += reward
+
+    def store_results(self):
+        pd.DataFrame(self.episode_rewards).to_csv(
+            RESULTS_DIR / f"{self.run_config.id}.csv", index=False
+        )
+
+    def close(self):
+        self.progress_bar.close()
 
 
 def get_env(run_config: RunConfig):
@@ -21,35 +51,49 @@ def get_env(run_config: RunConfig):
 
 
 def run_episode(
-    run_config: RunConfig, env: gym.Env, agent: Agent, episode: int, num_steps: int
+    run_config: RunConfig,
+    env: gym.Env,
+    agent: Agent,
+    episode: int,
+    num_steps: int,
+    metrics_logger: MetricsLogger,
 ):
     state, _ = env.reset()
     step = 0
     terminated = False
     truncated = False
+    metrics_logger.init_episode()
     while not terminated and not truncated and step < num_steps:
         action = agent.act(state)
         next_state, reward, terminated, truncated, info = env.step(action)
         agent.update(state, action, next_state, reward)
         state = next_state
         step += 1
-        logger.info(f"Step {step} of episode {episode} of {run_config.num_episodes}")
+        metrics_logger.update(reward)
+    metrics_logger.end_episode()
 
 
 def run_experiment(run_config: RunConfig):
     env = get_env(run_config)
     agent = get_agent(run_config, env)
     print(f"Running {run_config.num_episodes} episodes of {run_config.num_steps} steps")
+    metrics_logger = MetricsLogger(run_config)
     for episode in range(run_config.num_episodes):
-        run_episode(run_config, env, agent, episode, run_config.num_steps)
+        run_episode(
+            run_config, env, agent, episode, run_config.num_steps, metrics_logger
+        )
+    metrics_logger.store_results()
+    metrics_logger.close()
 
 
 def main():
     run_config = RunConfig(
+        id=0,
+        name="ppo",
         env_name="CartPole-v1",
         render=None,
         agent_name="ppo",
-        num_episodes=10,
+        num_episodes=1000,
         num_steps=1000,
     )
     run_experiment(run_config)

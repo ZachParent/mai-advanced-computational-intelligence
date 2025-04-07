@@ -48,7 +48,7 @@ def main():
     run_config = RunConfig(
         env_name="CartPole-v1",
         render=None,
-        agent_name="random",
+        agent_name="ppo",
         num_episodes=10,
         num_steps=1000,
     )

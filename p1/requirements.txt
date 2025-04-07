@@ -1,7 +1,9 @@
+ale-py
 einops
-gymnasium[classic_control]
+gymnasium[classic_control,atari,other]
 matplotlib
 numpy
 pandas
+stable-baselines3
 torch
 tqdm

@@ -1,59 +1,12 @@
 import logging
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Literal, Optional
 
-import numpy as np
+from agent import Agent, get_agent
+from run_config import RunConfig
 
 import gymnasium as gym
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(message)s")
-
-
-@dataclass
-class RunConfig:
-    env_name: Literal["CartPole-v1"]
-    agent_name: Literal["random"]
-    num_episodes: int
-    num_steps: int
-    seed: Optional[int] = None
-    render: Literal["rgb_array", "human", None] = None
-
-
-class Agent(ABC):
-    env: gym.Env
-
-    def __init__(self, env: gym.Env):
-        self.env = env
-
-    @abstractmethod
-    def act(self, state: np.ndarray) -> np.ndarray:
-        pass
-
-    @abstractmethod
-    def update(
-        self,
-        state: np.ndarray,
-        action: np.ndarray,
-        next_state: np.ndarray,
-        reward: float,
-    ):
-        pass
-
-
-class RandomAgent(Agent):
-    def act(self, state: np.ndarray) -> np.ndarray:
-        return self.env.action_space.sample()
-
-    def update(
-        self,
-        state: np.ndarray,
-        action: np.ndarray,
-        next_state: np.ndarray,
-        reward: float,
-    ):
-        pass
 
 
 def get_env(run_config: RunConfig):
@@ -65,13 +18,6 @@ def get_env(run_config: RunConfig):
     #     return gym.make("Pendulum-v1")
     else:
         raise ValueError(f"Environment {run_config.env_name} not found")
-
-
-def get_agent(run_config: RunConfig, env: gym.Env):
-    if run_config.agent_name == "random":
-        return RandomAgent(env)
-    else:
-        raise ValueError(f"Agent {run_config.agent_name} not found")
 
 
 def run_episode(
@@ -101,7 +47,7 @@ def run_experiment(run_config: RunConfig):
 def main():
     run_config = RunConfig(
         env_name="CartPole-v1",
-        render="human",
+        render=None,
         agent_name="random",
         num_episodes=10,
         num_steps=1000,

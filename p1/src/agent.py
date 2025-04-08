@@ -65,8 +65,6 @@ class RandomAgent(Agent):
         return RandomAgent(env)
 
 
-# --- Actor Network ---
-# Outputs the mean of the action distribution
 class Actor(nn.Module):
     def __init__(self, state_dim, action_dim):
         super().__init__()
@@ -84,8 +82,6 @@ class Actor(nn.Module):
         return self.network(state)
 
 
-# --- Critic Network ---
-# Outputs the estimated value of a state
 class Critic(nn.Module):
     def __init__(self, state_dim):
         super().__init__()
@@ -94,7 +90,7 @@ class Critic(nn.Module):
             nn.ReLU(),
             nn.Linear(64, 64),
             nn.ReLU(),
-            nn.Linear(64, 1),  # Outputs a single value
+            nn.Linear(64, 1),
         )
 
     def forward(self, state):
@@ -114,7 +110,6 @@ class PPOAgent(Agent):
         super().__init__(env)
         self.gamma = gamma
 
-        # Ensure continuous action space
         if not isinstance(env.action_space, gym.spaces.Box):
             raise ValueError(
                 "PPOAgent implementation only supports Box (continuous) action spaces."
@@ -128,7 +123,6 @@ class PPOAgent(Agent):
         state_dim = env.observation_space.shape[0]
         action_dim = env.action_space.shape[0]
 
-        # --- Actor ---
         self.actor = Actor(state_dim, action_dim)
         # Learnable log standard deviation for action distribution
         self.actor_log_std = nn.Parameter(torch.zeros(1, action_dim))
@@ -136,7 +130,6 @@ class PPOAgent(Agent):
             list(self.actor.parameters()) + [self.actor_log_std], lr=actor_lr
         )
 
-        # --- Critic ---
         self.critic = Critic(state_dim)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=critic_lr)
 
@@ -170,7 +163,6 @@ class PPOAgent(Agent):
         reward: float,
         terminated: bool,
     ) -> None:
-        # Convert inputs to tensors
         state_tensor = torch.FloatTensor(state).unsqueeze(0)
         action_tensor = torch.FloatTensor(action).unsqueeze(0)
         next_state_tensor = torch.FloatTensor(next_state).unsqueeze(0)
@@ -188,7 +180,6 @@ class PPOAgent(Agent):
         current_value = self.critic(state_tensor)
         critic_loss = F.mse_loss(current_value, target_value)
 
-        # Optimize the critic
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
         self.critic_optimizer.step()
@@ -209,7 +200,6 @@ class PPOAgent(Agent):
         # but optimizers perform gradient descent.
         actor_loss = (-log_prob * advantage).mean()  # Use mean if batching later
 
-        # Optimize the actor
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()
@@ -230,13 +220,7 @@ class PPOAgent(Agent):
 def get_agent(run_config: RunConfig, env: gym.Env):
     if run_config.agent_name == "random":
         return RandomAgent(env)
-    elif run_config.agent_name == "ppo":  # Keeping name 'ppo' for consistency
-        # Check if env is suitable (continuous) before creating agent
-        if not isinstance(env.action_space, gym.spaces.Box):
-            raise ValueError(
-                f"Agent 'ppo' (Actor-Critic) requires a continuous (Box) action space, "
-                f"but environment '{run_config.env_name}' has {type(env.action_space)}."
-            )
-        return PPOAgent(env)  # Actually returns our Actor-Critic agent
+    elif run_config.agent_name == "ppo":
+        return PPOAgent(env)
     else:
         raise ValueError(f"Agent {run_config.agent_name} not found")

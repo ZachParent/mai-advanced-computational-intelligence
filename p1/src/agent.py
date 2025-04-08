@@ -102,13 +102,11 @@ class PPOAgent(Agent):
     # as requested implicitly by the file structure. Note this isn't true PPO.
     def __init__(
         self,
+        run_config: RunConfig,
         env: gym.Env,
-        actor_lr: float = 1e-4,  # Learning rates might need tuning
-        critic_lr: float = 1e-3,
-        gamma: float = 0.99,
     ):
         super().__init__(env)
-        self.gamma = gamma
+        self.run_config = run_config
 
         if not isinstance(env.action_space, gym.spaces.Box):
             raise ValueError(
@@ -127,11 +125,14 @@ class PPOAgent(Agent):
         # Learnable log standard deviation for action distribution
         self.actor_log_std = nn.Parameter(torch.zeros(1, action_dim))
         self.actor_optimizer = optim.Adam(
-            list(self.actor.parameters()) + [self.actor_log_std], lr=actor_lr
+            list(self.actor.parameters()) + [self.actor_log_std],
+            lr=run_config.actor_lr,
         )
 
         self.critic = Critic(state_dim)
-        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=critic_lr)
+        self.critic_optimizer = optim.Adam(
+            self.critic.parameters(), lr=run_config.critic_lr
+        )
 
         # Store action scale/bias if needed (Pendulum needs scaling from Tanh's [-1,1])
         self.action_scale = (self.action_high - self.action_low) / 2.0
@@ -173,7 +174,7 @@ class PPOAgent(Agent):
         with torch.no_grad():
             # Calculate target value V_target = r + gamma * V(s') * (1 - done)
             next_value = self.critic(next_state_tensor)
-            target_value = reward_tensor + self.gamma * next_value * (
+            target_value = reward_tensor + self.run_config.gamma * next_value * (
                 1.0 - terminated_tensor
             )
 
@@ -210,8 +211,8 @@ class PPOAgent(Agent):
         torch.save(self.critic.state_dict(), path / "critic.pth")
 
     @staticmethod
-    def load(path: Path, env: gym.Env) -> "PPOAgent":
-        agent = PPOAgent(env)
+    def load(path: Path, run_config: RunConfig, env: gym.Env) -> "PPOAgent":
+        agent = PPOAgent(run_config, env)
         agent.actor.load_state_dict(torch.load(path / "actor.pth"))
         agent.critic.load_state_dict(torch.load(path / "critic.pth"))
         return agent
@@ -221,6 +222,6 @@ def get_agent(run_config: RunConfig, env: gym.Env):
     if run_config.agent_name == "random":
         return RandomAgent(env)
     elif run_config.agent_name == "ppo":
-        return PPOAgent(env)
+        return PPOAgent(run_config, env)
     else:
         raise ValueError(f"Agent {run_config.agent_name} not found")

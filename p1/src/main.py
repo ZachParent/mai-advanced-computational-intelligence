@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from agent import Agent, get_agent
 from config import AGENT_DIR, RESULTS_DIR, VIDEO_DIR
-from run_config import RunConfig
+from run_config import CONFIGS, RunConfig
 from tqdm import tqdm
 
 import gymnasium as gym
@@ -102,17 +102,10 @@ def run_experiment(run_config: RunConfig):
 
 
 def main():
-    run_config = RunConfig(
-        id=0,
-        name="ppo",
-        env_name="Pendulum-v1",
-        agent_name="ppo",
-        num_episodes=400,
-        num_steps=1000,
-        record_episode_spacing=20,
-    )
-    run_experiment(run_config)
-    logger.error("Experiment finished")
+    for run_config in CONFIGS:
+        print("=" * 80)
+        logger.info(f"Experiment {run_config.id}: {run_config.name}".center(80))
+        run_experiment(run_config)
 
 
 if __name__ == "__main__":

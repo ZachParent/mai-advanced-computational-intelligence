@@ -61,6 +61,8 @@ def get_env(run_config: RunConfig):
         return wrap_env(
             gym.make("InvertedPendulum-v5", render_mode="rgb_array"), run_config
         )
+    elif run_config.env_name == "Humanoid-v5":
+        return wrap_env(gym.make("Humanoid-v5", render_mode="rgb_array"), run_config)
     else:
         raise ValueError(f"Environment {run_config.env_name} not found")
 

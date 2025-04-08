@@ -44,8 +44,8 @@ def get_env(run_config: RunConfig):
         return gym.make("CartPole-v1", render_mode=run_config.render)
     # elif run_config.env_name == "MountainCar-v0":
     #     return gym.make("MountainCar-v0")
-    # elif run_config.env_name == "Pendulum-v1":
-    #     return gym.make("Pendulum-v1")
+    elif run_config.env_name == "Pendulum-v1":
+        return gym.make("Pendulum-v1", render_mode=run_config.render)
     else:
         raise ValueError(f"Environment {run_config.env_name} not found")
 
@@ -66,7 +66,7 @@ def run_episode(
     while not terminated and not truncated and step < num_steps:
         action = agent.act(state)
         next_state, reward, terminated, truncated, info = env.step(action)
-        agent.update(state, action, next_state, reward)
+        agent.update(state, action, next_state, reward, terminated)
         state = next_state
         step += 1
         metrics_logger.update(reward)
@@ -90,7 +90,7 @@ def main():
     run_config = RunConfig(
         id=0,
         name="ppo",
-        env_name="CartPole-v1",
+        env_name="Pendulum-v1",
         render=None,
         agent_name="ppo",
         num_episodes=1000,

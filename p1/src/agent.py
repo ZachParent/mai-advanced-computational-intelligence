@@ -1,8 +1,12 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
-from einops import rearrange
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
 from run_config import RunConfig
+from torch.distributions import Normal
 
 import gymnasium as gym
 
@@ -12,6 +16,9 @@ class Agent(ABC):
 
     def __init__(self, env: gym.Env):
         self.env = env
+        # Get action space bounds for clipping
+        self.action_low = torch.tensor(self.env.action_space.low, dtype=torch.float32)
+        self.action_high = torch.tensor(self.env.action_space.high, dtype=torch.float32)
 
     @abstractmethod
     def act(self, state: np.ndarray) -> np.ndarray:
@@ -24,6 +31,7 @@ class Agent(ABC):
         action: np.ndarray,
         next_state: np.ndarray,
         reward: float,
+        terminated: bool,
     ):
         pass
 
@@ -38,35 +46,102 @@ class RandomAgent(Agent):
         action: np.ndarray,
         next_state: np.ndarray,
         reward: float,
+        terminated: bool,
     ):
         pass
 
 
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.optim as optim
+# --- Actor Network ---
+# Outputs the mean of the action distribution
+class Actor(nn.Module):
+    def __init__(self, state_dim, action_dim):
+        super().__init__()
+        self.network = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, action_dim),
+            nn.Tanh(),  # Tanh activation often used for continuous actions bounded [-1, 1]
+            # Pendulum action space is [-2, 2], we'll scale later
+        )
+
+    def forward(self, state):
+        return self.network(state)
+
+
+# --- Critic Network ---
+# Outputs the estimated value of a state
+class Critic(nn.Module):
+    def __init__(self, state_dim):
+        super().__init__()
+        self.network = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1),  # Outputs a single value
+        )
+
+    def forward(self, state):
+        return self.network(state)
 
 
 class PPOAgent(Agent):
-    def __init__(self, env: gym.Env, learning_rate: float = 0.001, gamma: float = 0.99):
+    # Renamed PPOAgent to ActorCriticAgent for clarity, but kept class name PPOAgent
+    # as requested implicitly by the file structure. Note this isn't true PPO.
+    def __init__(
+        self,
+        env: gym.Env,
+        actor_lr: float = 1e-4,  # Learning rates might need tuning
+        critic_lr: float = 1e-3,
+        gamma: float = 0.99,
+    ):
         super().__init__(env)
-        self.policy_net = nn.Sequential(
-            nn.Linear(env.observation_space.shape[0], 64),
-            nn.ReLU(),
-            nn.Linear(64, env.action_space.n),
-            nn.Softmax(dim=-1),
-        )
-        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=learning_rate)
         self.gamma = gamma
+
+        # Ensure continuous action space
+        if not isinstance(env.action_space, gym.spaces.Box):
+            raise ValueError(
+                "PPOAgent implementation only supports Box (continuous) action spaces."
+            )
+
+        state_dim = env.observation_space.shape[0]
+        action_dim = env.action_space.shape[0]
+
+        # --- Actor ---
+        self.actor = Actor(state_dim, action_dim)
+        # Learnable log standard deviation for action distribution
+        self.actor_log_std = nn.Parameter(torch.zeros(1, action_dim))
+        self.actor_optimizer = optim.Adam(
+            list(self.actor.parameters()) + [self.actor_log_std], lr=actor_lr
+        )
+
+        # --- Critic ---
+        self.critic = Critic(state_dim)
+        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=critic_lr)
+
+        # Store action scale/bias if needed (Pendulum needs scaling from Tanh's [-1,1])
+        self.action_scale = (self.action_high - self.action_low) / 2.0
+        self.action_bias = (self.action_high + self.action_low) / 2.0
+
+    def get_distribution(self, state: torch.Tensor) -> Normal:
+        """Gets the action distribution for a given state"""
+        action_mean_normalized = self.actor(state)  # Output is in [-1, 1] due to Tanh
+        log_std = self.actor_log_std.expand_as(action_mean_normalized)
+        std = torch.exp(log_std)
+        # Scale mean to environment's action space
+        action_mean = action_mean_normalized * self.action_scale + self.action_bias
+        return Normal(action_mean, std)
 
     def act(self, state: np.ndarray) -> np.ndarray:
         state_tensor = torch.FloatTensor(state).unsqueeze(0)
-        action_probs = self.policy_net(state_tensor)
-        action = np.random.choice(
-            self.env.action_space.n, p=action_probs.detach().numpy()[0]
-        )
-        return action
+        with torch.no_grad():
+            dist = self.get_distribution(state_tensor)
+            action = dist.sample()  # Sample action from the distribution
+        # Clip action to ensure it's within valid bounds
+        action_clipped = torch.clamp(action, self.action_low, self.action_high)
+        return action_clipped.squeeze(0).numpy()  # Return numpy array
 
     def update(
         self,
@@ -74,34 +149,63 @@ class PPOAgent(Agent):
         action: np.ndarray,
         next_state: np.ndarray,
         reward: float,
+        terminated: bool,
     ) -> None:
-        # Calculate the advantage
-        state_tensor = rearrange(torch.FloatTensor(state), "... -> 1 ...")
-        next_state_tensor = rearrange(torch.FloatTensor(next_state), "... -> 1 ...")
-        reward_tensor = torch.FloatTensor([reward])
+        # Convert inputs to tensors
+        state_tensor = torch.FloatTensor(state).unsqueeze(0)
+        action_tensor = torch.FloatTensor(action).unsqueeze(0)
+        next_state_tensor = torch.FloatTensor(next_state).unsqueeze(0)
+        reward_tensor = torch.FloatTensor([reward]).unsqueeze(0)
+        terminated_tensor = torch.FloatTensor([1.0 if terminated else 0.0]).unsqueeze(0)
 
-        # Get current action probabilities
-        current_probs = self.policy_net(state_tensor)
-        current_action_prob = current_probs[0, action]
-
-        # Calculate the target value (using reward and next state)
+        # --- Critic Update ---
         with torch.no_grad():
-            next_action_probs = self.policy_net(next_state_tensor)
-        target_value = reward_tensor + self.gamma * next_action_probs[0, action]
+            # Calculate target value V_target = r + gamma * V(s') * (1 - done)
+            next_value = self.critic(next_state_tensor)
+            target_value = reward_tensor + self.gamma * next_value * (
+                1.0 - terminated_tensor
+            )
 
-        # Calculate the loss
-        loss = -torch.log(current_action_prob) * target_value
+        current_value = self.critic(state_tensor)
+        critic_loss = F.mse_loss(current_value, target_value)
 
-        # Backpropagate the loss
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
+        # Optimize the critic
+        self.critic_optimizer.zero_grad()
+        critic_loss.backward()
+        self.critic_optimizer.step()
+
+        # --- Actor Update ---
+        # Calculate advantage A(s,a) = V_target - V(s)
+        # Detach target_value and current_value to prevent gradients flowing into critic update from actor update
+        advantage = (target_value - current_value).detach()
+
+        # Get action distribution and log probability of the taken action
+        dist = self.get_distribution(state_tensor)
+        log_prob = dist.log_prob(action_tensor).sum(
+            dim=-1, keepdim=True
+        )  # Sum log_prob across action dimensions if > 1
+
+        # Actor loss: -log_prob * advantage
+        # Negative sign because we want to maximize log_prob * advantage (gradient ascent)
+        # but optimizers perform gradient descent.
+        actor_loss = (-log_prob * advantage).mean()  # Use mean if batching later
+
+        # Optimize the actor
+        self.actor_optimizer.zero_grad()
+        actor_loss.backward()
+        self.actor_optimizer.step()
 
 
 def get_agent(run_config: RunConfig, env: gym.Env):
     if run_config.agent_name == "random":
         return RandomAgent(env)
-    elif run_config.agent_name == "ppo":
-        return PPOAgent(env)
+    elif run_config.agent_name == "ppo":  # Keeping name 'ppo' for consistency
+        # Check if env is suitable (continuous) before creating agent
+        if not isinstance(env.action_space, gym.spaces.Box):
+            raise ValueError(
+                f"Agent 'ppo' (Actor-Critic) requires a continuous (Box) action space, "
+                f"but environment '{run_config.env_name}' has {type(env.action_space)}."
+            )
+        return PPOAgent(env)  # Actually returns our Actor-Critic agent
     else:
         raise ValueError(f"Agent {run_config.agent_name} not found")

@@ -6,8 +6,8 @@ from typing import Literal, Optional
 class RunConfig:
     id: int
     name: str
-    env_name: Literal["CartPole-v1"]
-    agent_name: Literal["random"]
+    env_name: Literal["CartPole-v1", "Pendulum-v1"]
+    agent_name: Literal["random", "ppo"]
     num_episodes: int
     num_steps: int
     seed: Optional[int] = None

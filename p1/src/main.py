@@ -3,11 +3,12 @@ import logging
 import numpy as np
 import pandas as pd
 from agent import Agent, get_agent
-from config import RESULTS_DIR
+from config import RESULTS_DIR, VIDEO_DIR
 from run_config import RunConfig
 from tqdm import tqdm
 
 import gymnasium as gym
+from gymnasium.wrappers import RecordEpisodeStatistics, RecordVideo
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -39,13 +40,24 @@ class MetricsLogger:
         self.progress_bar.close()
 
 
+def wrap_env(env: gym.Env, run_config: RunConfig):
+    if run_config.record_episode_spacing:
+        VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+        env = RecordVideo(
+            env,
+            video_folder=VIDEO_DIR / f"{run_config.id:03d}",
+            episode_trigger=lambda episode: episode % run_config.record_episode_spacing
+            == 0,
+            name_prefix=f"run-{run_config.id:03d}",
+        )
+    return RecordEpisodeStatistics(env)
+
+
 def get_env(run_config: RunConfig):
     if run_config.env_name == "CartPole-v1":
-        return gym.make("CartPole-v1", render_mode=run_config.render)
-    # elif run_config.env_name == "MountainCar-v0":
-    #     return gym.make("MountainCar-v0")
+        return wrap_env(gym.make("CartPole-v1", render_mode="rgb_array"), run_config)
     elif run_config.env_name == "Pendulum-v1":
-        return gym.make("Pendulum-v1", render_mode=run_config.render)
+        return wrap_env(gym.make("Pendulum-v1", render_mode="rgb_array"), run_config)
     else:
         raise ValueError(f"Environment {run_config.env_name} not found")
 
@@ -91,10 +103,10 @@ def main():
         id=0,
         name="ppo",
         env_name="Pendulum-v1",
-        render=None,
         agent_name="ppo",
-        num_episodes=1000,
+        num_episodes=20,
         num_steps=1000,
+        record_episode_spacing=10,
     )
     run_experiment(run_config)
     logger.error("Experiment finished")

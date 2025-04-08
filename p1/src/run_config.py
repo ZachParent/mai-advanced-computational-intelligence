@@ -11,4 +11,4 @@ class RunConfig:
     num_episodes: int
     num_steps: int
     seed: Optional[int] = None
-    render: Literal["rgb_array", "human", None] = None
+    record_episode_spacing: Optional[int] = None

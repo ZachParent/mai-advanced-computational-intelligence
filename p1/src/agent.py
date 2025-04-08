@@ -37,9 +37,9 @@ class Agent(ABC):
     def save(self, path: Path):
         pass
 
-    @abstractmethod
     @staticmethod
-    def load(path: Path) -> "Agent":
+    @abstractmethod
+    def load(path: Path, env: gym.Env) -> "Agent":
         pass
 
 

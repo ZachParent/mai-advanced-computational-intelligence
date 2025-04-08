@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import pandas as pd
 from agent import Agent, get_agent
-from config import RESULTS_DIR, VIDEO_DIR
+from config import AGENT_DIR, RESULTS_DIR, VIDEO_DIR
 from run_config import RunConfig
 from tqdm import tqdm
 
@@ -98,6 +98,7 @@ def run_experiment(run_config: RunConfig):
         )
     metrics_logger.store_results()
     metrics_logger.close()
+    agent.save(AGENT_DIR / f"{run_config.id}")
 
 
 def main():

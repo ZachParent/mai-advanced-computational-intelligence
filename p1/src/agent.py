@@ -215,6 +215,7 @@ class PPOAgent(Agent):
         self.actor_optimizer.step()
 
     def save(self, path: Path) -> None:
+        path.mkdir(parents=True, exist_ok=True)
         torch.save(self.actor.state_dict(), path / "actor.pth")
         torch.save(self.critic.state_dict(), path / "critic.pth")
 

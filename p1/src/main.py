@@ -1,8 +1,7 @@
 import logging
 
-import numpy as np
 import pandas as pd
-from agent import PPOAgent, get_agent
+from agent import Agent, PPOAgent, get_agent
 from config import AGENT_DIR, RESULTS_DIR, VIDEO_DIR
 from run_config import CONFIGS, RunConfig
 from tqdm import tqdm
@@ -26,7 +25,7 @@ class MetricsLogger:
 
     def end_episode(self):
         self.progress_bar.update(1)
-        self.progress_bar.desc = f"Reward: {np.mean(self.episode_rewards)}"
+        self.progress_bar.desc = f"Reward: {self.episode_rewards[-1]}"
 
     def update(self, reward: float):
         self.episode_rewards[-1] += reward
@@ -67,7 +66,7 @@ def get_env(run_config: RunConfig):
 def run_episode(
     run_config: RunConfig,
     env: gym.Env,
-    agent: PPOAgent,
+    agent: Agent,
     episode: int,
     num_steps: int,
     metrics_logger: MetricsLogger,
@@ -81,7 +80,7 @@ def run_episode(
         action_np, log_prob_tensor = agent.act(state)
         next_state, reward, terminated, truncated, info = env.step(action_np)
         agent.store_transition(
-            state, action_np, reward, next_state, terminated, log_prob_tensor
+            state, action_np, float(reward), next_state, terminated, log_prob_tensor
         )
         state = next_state
         step += 1
@@ -108,39 +107,17 @@ def run_experiment(run_config: RunConfig):
     metrics_logger = MetricsLogger(run_config)
 
     for episode in range(run_config.num_episodes):
-        if is_trainable:
-            run_episode(
-                run_config, env, agent, episode, run_config.num_steps, metrics_logger
-            )
-        else:
-            state, _ = env.reset()
-            step = 0
-            terminated = False
-            truncated = False
-            metrics_logger.init_episode()
-            while not terminated and not truncated and step < run_config.num_steps:
-                action_output = agent.act(state)
-                action = (
-                    action_output[0]
-                    if isinstance(action_output, tuple)
-                    else action_output
-                )
-                next_state, reward, terminated, truncated, info = env.step(action)
-                state = next_state
-                step += 1
-                metrics_logger.update(float(reward))
-            metrics_logger.end_episode()
+        run_episode(
+            run_config, env, agent, episode, run_config.num_steps, metrics_logger
+        )
 
-        if is_trainable:
-            if run_config.ppo_hyperparams is None:
-                raise ValueError(
-                    "Trainable PPOAgent requires ppo_hyperparams in RunConfig"
-                )
-            if (
-                (episode + 1) % run_config.ppo_hyperparams.num_episodes_per_update == 0
-                or episode == run_config.num_episodes - 1
-            ):
-                agent.update()
+        if run_config.ppo_hyperparams is None:
+            raise ValueError("Trainable PPOAgent requires ppo_hyperparams in RunConfig")
+        if (
+            (episode + 1) % run_config.ppo_hyperparams.num_episodes_per_update == 0
+            or episode == run_config.num_episodes - 1
+        ):
+            agent.update()
 
     metrics_logger.store_results()
     metrics_logger.close()

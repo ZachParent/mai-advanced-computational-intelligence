@@ -24,13 +24,20 @@ class Agent(ABC):
         pass
 
     @abstractmethod
-    def update(
+    def store_transition(
         self,
         state: np.ndarray,
         action: np.ndarray,
-        next_state: np.ndarray,
         reward: float,
+        next_state: np.ndarray,
         terminated: bool,
+        log_prob: float,
+    ):
+        pass
+
+    @abstractmethod
+    def update(
+        self,
     ):
         pass
 
@@ -48,13 +55,19 @@ class RandomAgent(Agent):
     def act(self, state: np.ndarray) -> np.ndarray:
         return self.env.action_space.sample()
 
-    def update(
+    def store_transition(
         self,
         state: np.ndarray,
         action: np.ndarray,
-        next_state: np.ndarray,
         reward: float,
+        next_state: np.ndarray,
         terminated: bool,
+        log_prob: float,
+    ):
+        pass
+
+    def update(
+        self,
     ):
         pass
 

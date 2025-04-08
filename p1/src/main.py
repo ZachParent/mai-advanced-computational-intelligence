@@ -55,10 +55,12 @@ def wrap_env(env: gym.Env, run_config: RunConfig):
 
 
 def get_env(run_config: RunConfig):
-    if run_config.env_name == "CartPole-v1":
-        return wrap_env(gym.make("CartPole-v1", render_mode="rgb_array"), run_config)
-    elif run_config.env_name == "Pendulum-v1":
+    if run_config.env_name == "Pendulum-v1":
         return wrap_env(gym.make("Pendulum-v1", render_mode="rgb_array"), run_config)
+    elif run_config.env_name == "InvertedPendulum-v5":
+        return wrap_env(
+            gym.make("InvertedPendulum-v5", render_mode="rgb_array"), run_config
+        )
     else:
         raise ValueError(f"Environment {run_config.env_name} not found")
 

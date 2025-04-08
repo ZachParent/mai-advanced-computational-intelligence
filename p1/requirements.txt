@@ -1,6 +1,6 @@
 ale-py
 einops
-gymnasium[classic_control,atari,other]
+gymnasium[classic_control,mujoco]
 matplotlib
 numpy
 pandas

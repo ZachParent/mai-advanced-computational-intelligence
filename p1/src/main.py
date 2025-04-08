@@ -32,7 +32,7 @@ class MetricsLogger:
 
     def store_results(self):
         pd.DataFrame(self.episode_rewards).to_csv(
-            RESULTS_DIR / f"{self.run_config.id}.csv", index=False
+            RESULTS_DIR / f"{self.run_config.id:02d}.csv", index=False
         )
 
     def close(self):
@@ -47,9 +47,9 @@ def wrap_env(env: gym.Env, run_config: RunConfig):
         VIDEO_DIR.mkdir(parents=True, exist_ok=True)
         env = RecordVideo(
             env,
-            video_folder=str(VIDEO_DIR / f"{run_config.id:03d}"),
+            video_folder=str(VIDEO_DIR / f"{run_config.id:02d}"),
             episode_trigger=episode_trigger,
-            name_prefix=f"run-{run_config.id:03d}",
+            name_prefix=f"run-{run_config.id:02d}",
         )
     return RecordEpisodeStatistics(env)
 
@@ -121,10 +121,9 @@ def run_experiment(run_config: RunConfig):
 
     metrics_logger.store_results()
     metrics_logger.close()
-    if hasattr(agent, "save"):
-        save_path = AGENT_DIR / f"{run_config.id}"
-        agent.save(save_path)
-        print(f"Agent saved to {save_path}")
+    save_path = AGENT_DIR / f"{run_config.id:02d}"
+    agent.save(save_path)
+    print(f"Agent saved to {save_path}")
 
 
 def main():

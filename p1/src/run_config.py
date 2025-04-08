@@ -20,7 +20,7 @@ class RunConfig:
     name: str
     env_name: Literal["CartPole-v1", "Pendulum-v1"]
     agent_name: Literal["random", "ppo"]
-    num_episodes: int = 10000
+    num_episodes: int = 1000
     num_steps: int = 400
     seed: Optional[int] = None
     record_episode_spacing: Optional[int] = 100

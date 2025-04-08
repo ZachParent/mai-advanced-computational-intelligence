@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections import deque
 from pathlib import Path
 
 import numpy as np
@@ -98,8 +99,6 @@ class Critic(nn.Module):
 
 
 class PPOAgent(Agent):
-    # Renamed PPOAgent to ActorCriticAgent for clarity, but kept class name PPOAgent
-    # as requested implicitly by the file structure. Note this isn't true PPO.
     def __init__(
         self,
         run_config: RunConfig,
@@ -107,6 +106,16 @@ class PPOAgent(Agent):
     ):
         super().__init__(env)
         self.run_config = run_config
+
+        if self.run_config.ppo_hyperparams is None:
+            raise ValueError("PPOAgent requires ppo_hyperparams in RunConfig")
+        hp = self.run_config.ppo_hyperparams
+
+        self.clip_epsilon = hp.clip_epsilon
+        self.update_epochs = hp.update_epochs
+        self.gae_lambda = hp.gae_lambda
+        self.buffer_capacity = hp.buffer_capacity
+        self.buffer = deque(maxlen=self.buffer_capacity)
 
         if not isinstance(env.action_space, gym.spaces.Box):
             raise ValueError(
@@ -122,88 +131,106 @@ class PPOAgent(Agent):
         action_dim = env.action_space.shape[0]
 
         self.actor = Actor(state_dim, action_dim)
-        # Learnable log standard deviation for action distribution
         self.actor_log_std = nn.Parameter(torch.zeros(1, action_dim))
         self.actor_optimizer = optim.Adam(
             list(self.actor.parameters()) + [self.actor_log_std],
-            lr=run_config.actor_lr,
+            lr=hp.actor_lr,
         )
 
         self.critic = Critic(state_dim)
-        self.critic_optimizer = optim.Adam(
-            self.critic.parameters(), lr=run_config.critic_lr
-        )
+        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=hp.critic_lr)
 
-        # Store action scale/bias if needed (Pendulum needs scaling from Tanh's [-1,1])
         self.action_scale = (self.action_high - self.action_low) / 2.0
         self.action_bias = (self.action_high + self.action_low) / 2.0
 
     def get_distribution(self, state: torch.Tensor) -> Normal:
-        """Gets the action distribution for a given state"""
-        action_mean_normalized = self.actor(state)  # Output is in [-1, 1] due to Tanh
+        action_mean_normalized = self.actor(state)
         log_std = self.actor_log_std.expand_as(action_mean_normalized)
         std = torch.exp(log_std)
-        # Scale mean to environment's action space
         action_mean = action_mean_normalized * self.action_scale + self.action_bias
         return Normal(action_mean, std)
 
-    def act(self, state: np.ndarray) -> np.ndarray:
+    def act(self, state: np.ndarray) -> tuple[np.ndarray, torch.Tensor]:
         state_tensor = torch.FloatTensor(state).unsqueeze(0)
         with torch.no_grad():
             dist = self.get_distribution(state_tensor)
-            action = dist.sample()  # Sample action from the distribution
-        # Clip action to ensure it's within valid bounds
+            action = dist.sample()
+            log_prob = dist.log_prob(action).sum(dim=-1)
         action_clipped = torch.clamp(action, self.action_low, self.action_high)
-        return action_clipped.squeeze(0).numpy()  # Return numpy array
+        return action_clipped.squeeze(0).numpy(), log_prob
 
-    def update(
-        self,
-        state: np.ndarray,
-        action: np.ndarray,
-        next_state: np.ndarray,
-        reward: float,
-        terminated: bool,
-    ) -> None:
-        state_tensor = torch.FloatTensor(state).unsqueeze(0)
-        action_tensor = torch.FloatTensor(action).unsqueeze(0)
-        next_state_tensor = torch.FloatTensor(next_state).unsqueeze(0)
-        reward_tensor = torch.FloatTensor([reward]).unsqueeze(0)
-        terminated_tensor = torch.FloatTensor([1.0 if terminated else 0.0]).unsqueeze(0)
+    def store_transition(self, state, action, reward, next_state, terminated, log_prob):
+        self.buffer.append((state, action, reward, next_state, terminated, log_prob))
 
-        # --- Critic Update ---
-        with torch.no_grad():
-            # Calculate target value V_target = r + gamma * V(s') * (1 - done)
-            next_value = self.critic(next_state_tensor)
-            target_value = reward_tensor + self.run_config.gamma * next_value * (
-                1.0 - terminated_tensor
+    def update(self) -> None:
+        if len(self.buffer) == 0:
+            return
+
+        if self.run_config.ppo_hyperparams is None:
+            raise ValueError(
+                "PPOAgent requires ppo_hyperparams in RunConfig for update"
             )
+        hp = self.run_config.ppo_hyperparams
 
-        current_value = self.critic(state_tensor)
-        critic_loss = F.mse_loss(current_value, target_value)
+        batch = list(self.buffer)
+        states, actions, rewards, next_states, terminateds, log_probs_old = zip(*batch)
 
-        self.critic_optimizer.zero_grad()
-        critic_loss.backward()
-        self.critic_optimizer.step()
+        states_tensor = torch.FloatTensor(np.array(states))
+        actions_tensor = torch.FloatTensor(np.array(actions))
+        rewards_tensor = torch.FloatTensor(rewards).unsqueeze(1)
+        next_states_tensor = torch.FloatTensor(np.array(next_states))
+        terminateds_tensor = torch.FloatTensor(terminateds).unsqueeze(1)
+        log_probs_old_tensor = torch.stack(log_probs_old).detach().unsqueeze(1)
 
-        # --- Actor Update ---
-        # Calculate advantage A(s,a) = V_target - V(s)
-        # Detach target_value and current_value to prevent gradients flowing into critic update from actor update
-        advantage = (target_value - current_value).detach()
+        with torch.no_grad():
+            values = self.critic(states_tensor)
+            next_values = self.critic(next_states_tensor)
 
-        # Get action distribution and log probability of the taken action
-        dist = self.get_distribution(state_tensor)
-        log_prob = dist.log_prob(action_tensor).sum(
-            dim=-1, keepdim=True
-        )  # Sum log_prob across action dimensions if > 1
+            advantages = torch.zeros_like(rewards_tensor)
+            last_advantage = 0
+            for t in reversed(range(len(rewards_tensor))):
+                mask = 1.0 - terminateds_tensor[t]
+                delta = rewards_tensor[t] + hp.gamma * next_values[t] * mask - values[t]
+                advantages[t] = delta + hp.gamma * hp.gae_lambda * last_advantage * mask
+                last_advantage = advantages[t]
 
-        # Actor loss: -log_prob * advantage
-        # Negative sign because we want to maximize log_prob * advantage (gradient ascent)
-        # but optimizers perform gradient descent.
-        actor_loss = (-log_prob * advantage).mean()  # Use mean if batching later
+            returns_tensor = advantages + values
 
-        self.actor_optimizer.zero_grad()
-        actor_loss.backward()
-        self.actor_optimizer.step()
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+
+        states_tensor = states_tensor.view(-1, states_tensor.shape[-1])
+        actions_tensor = actions_tensor.view(-1, actions_tensor.shape[-1])
+        log_probs_old_tensor = log_probs_old_tensor.view(-1)
+        advantages = advantages.view(-1)
+        returns_tensor = returns_tensor.view(-1)
+
+        num_samples = states_tensor.shape[0]
+
+        for epoch in range(hp.update_epochs):
+            dist = self.get_distribution(states_tensor)
+            log_probs_new = dist.log_prob(actions_tensor).sum(dim=-1)
+            entropy = dist.entropy().mean()
+            values_new = self.critic(states_tensor).view(-1)
+
+            ratio = torch.exp(log_probs_new - log_probs_old_tensor)
+            surr1 = ratio * advantages
+            surr2 = (
+                torch.clamp(ratio, 1.0 - hp.clip_epsilon, 1.0 + hp.clip_epsilon)
+                * advantages
+            )
+            actor_loss = -torch.min(surr1, surr2).mean()
+
+            self.actor_optimizer.zero_grad()
+            actor_loss.backward()
+            self.actor_optimizer.step()
+
+            critic_loss = F.mse_loss(values_new, returns_tensor)
+
+            self.critic_optimizer.zero_grad()
+            critic_loss.backward()
+            self.critic_optimizer.step()
+
+        self.buffer.clear()
 
     def save(self, path: Path) -> None:
         path.mkdir(parents=True, exist_ok=True)
@@ -220,8 +247,14 @@ class PPOAgent(Agent):
 
 def get_agent(run_config: RunConfig, env: gym.Env):
     if run_config.agent_name == "random":
-        return RandomAgent(env)
+        try:
+            return RandomAgent(env)
+        except TypeError:
+            print("Warning: RandomAgent missing save/load, cannot be instantiated.")
+            raise
     elif run_config.agent_name == "ppo":
-        return PPOAgent(run_config, env)
+        if not isinstance(env.action_space, gym.spaces.Box):
+            raise ValueError(f"Agent 'ppo' requires Box space")
+        return PPOAgent(run_config=run_config, env=env)
     else:
         raise ValueError(f"Agent {run_config.agent_name} not found")

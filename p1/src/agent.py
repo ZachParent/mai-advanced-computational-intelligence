@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -16,9 +17,6 @@ class Agent(ABC):
 
     def __init__(self, env: gym.Env):
         self.env = env
-        # Get action space bounds for clipping
-        self.action_low = torch.tensor(self.env.action_space.low, dtype=torch.float32)
-        self.action_high = torch.tensor(self.env.action_space.high, dtype=torch.float32)
 
     @abstractmethod
     def act(self, state: np.ndarray) -> np.ndarray:
@@ -33,6 +31,15 @@ class Agent(ABC):
         reward: float,
         terminated: bool,
     ):
+        pass
+
+    @abstractmethod
+    def save(self, path: Path):
+        pass
+
+    @abstractmethod
+    @staticmethod
+    def load(path: Path) -> "Agent":
         pass
 
 
@@ -49,6 +56,13 @@ class RandomAgent(Agent):
         terminated: bool,
     ):
         pass
+
+    def save(self, path: Path) -> None:
+        pass
+
+    @staticmethod
+    def load(path: Path, env: gym.Env) -> "RandomAgent":
+        return RandomAgent(env)
 
 
 # --- Actor Network ---
@@ -105,7 +119,12 @@ class PPOAgent(Agent):
             raise ValueError(
                 "PPOAgent implementation only supports Box (continuous) action spaces."
             )
+        self.action_low = torch.tensor(env.action_space.low, dtype=torch.float32)
+        self.action_high = torch.tensor(env.action_space.high, dtype=torch.float32)
 
+        assert (
+            env.observation_space.shape is not None
+        ), "Observation space shape cannot be None"
         state_dim = env.observation_space.shape[0]
         action_dim = env.action_space.shape[0]
 
@@ -194,6 +213,17 @@ class PPOAgent(Agent):
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()
+
+    def save(self, path: Path) -> None:
+        torch.save(self.actor.state_dict(), path / "actor.pth")
+        torch.save(self.critic.state_dict(), path / "critic.pth")
+
+    @staticmethod
+    def load(path: Path, env: gym.Env) -> "PPOAgent":
+        agent = PPOAgent(env)
+        agent.actor.load_state_dict(torch.load(path / "actor.pth"))
+        agent.critic.load_state_dict(torch.load(path / "critic.pth"))
+        return agent
 
 
 def get_agent(run_config: RunConfig, env: gym.Env):

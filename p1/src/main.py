@@ -41,13 +41,15 @@ class MetricsLogger:
 
 
 def wrap_env(env: gym.Env, run_config: RunConfig):
-    if run_config.record_episode_spacing:
+    if type(run_config.record_episode_spacing) == int:
+        episode_trigger = (
+            lambda episode: episode % run_config.record_episode_spacing == 0
+        )
         VIDEO_DIR.mkdir(parents=True, exist_ok=True)
         env = RecordVideo(
             env,
-            video_folder=VIDEO_DIR / f"{run_config.id:03d}",
-            episode_trigger=lambda episode: episode % run_config.record_episode_spacing
-            == 0,
+            video_folder=str(VIDEO_DIR / f"{run_config.id:03d}"),
+            episode_trigger=episode_trigger,
             name_prefix=f"run-{run_config.id:03d}",
         )
     return RecordEpisodeStatistics(env)
@@ -78,10 +80,10 @@ def run_episode(
     while not terminated and not truncated and step < num_steps:
         action = agent.act(state)
         next_state, reward, terminated, truncated, info = env.step(action)
-        agent.update(state, action, next_state, reward, terminated)
+        agent.update(state, action, next_state, float(reward), terminated)
         state = next_state
         step += 1
-        metrics_logger.update(reward)
+        metrics_logger.update(float(reward))
     metrics_logger.end_episode()
 
 

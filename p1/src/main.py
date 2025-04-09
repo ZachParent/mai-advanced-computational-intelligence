@@ -103,8 +103,9 @@ def run_experiment(run_config: RunConfig):
         hp = run_config.ppo_hyperparams
         if hp is None:
             raise ValueError("PPOAgent needs hyperparameters")
+        mb_size = getattr(agent, "minibatch_size", "N/A")
         print(
-            f"  Agent: PPO, Rollout Length: {run_config.num_steps}, Mini-batch Size: {agent.minibatch_size}, Update Epochs: {hp.update_epochs}"
+            f"  Agent: PPO, Rollout Length: {run_config.num_steps}, Mini-batch Size: {mb_size}, Update Epochs: {hp.update_epochs}"
         )
     else:
         print(f"  Agent: {run_config.agent_name} (Not training)")
@@ -115,15 +116,20 @@ def run_experiment(run_config: RunConfig):
     metrics_logger.start_episode()
 
     while global_step < run_config.total_timesteps:
-        action_np, log_prob_tensor = agent.act(state)
+        action_unclipped_tensor, action_clipped_np, log_prob_tensor = agent.act(state)
 
-        next_state, reward, terminated, truncated, info = env.step(action_np)
+        next_state, reward, terminated, truncated, info = env.step(action_clipped_np)
         global_step += 1
         metrics_logger.step(float(reward))
 
         if is_trainable:
             agent.store_transition(
-                state, action_np, float(reward), next_state, terminated, log_prob_tensor
+                state,
+                action_unclipped_tensor,
+                float(reward),
+                next_state,
+                terminated,
+                log_prob_tensor,
             )
 
         state = next_state

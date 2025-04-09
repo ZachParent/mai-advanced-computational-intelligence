@@ -28,18 +28,20 @@ class Agent(ABC):
         self.env = env
 
     @abstractmethod
-    def act(self, state: np.ndarray) -> np.ndarray:
-        pass
+    def act(
+        self, state: np.ndarray
+    ) -> tuple[torch.Tensor, np.ndarray, Optional[torch.Tensor]]:
+        """Returns unclipped action tensor, clipped action numpy array, optional log prob tensor."""
 
     @abstractmethod
     def store_transition(
         self,
         state: np.ndarray,
-        action: np.ndarray,
+        action_unclipped: torch.Tensor,
         reward: float,
         next_state: np.ndarray,
         terminated: bool,
-        log_prob: torch.Tensor,
+        log_prob: Optional[torch.Tensor],
     ):
         pass
 
@@ -62,19 +64,28 @@ class Agent(ABC):
 
 
 class RandomAgent(Agent):
-    def act(self, state: np.ndarray) -> tuple[np.ndarray, Optional[torch.Tensor]]:
-        return self.env.action_space.sample(), None
+    def act(
+        self, state: np.ndarray
+    ) -> tuple[torch.Tensor, np.ndarray, Optional[torch.Tensor]]:
+        action_np = self.env.action_space.sample()
+        # For random agent, clipped and unclipped are the same, return as tensor/numpy
+        action_tensor = torch.tensor(action_np, dtype=torch.float32)
+        return (
+            action_tensor,
+            action_np,
+            None,
+        )  # Unclipped Tensor, Clipped Numpy, No log_prob
 
     def store_transition(
         self,
         state: np.ndarray,
-        action: np.ndarray,
+        action_unclipped: torch.Tensor,
         reward: float,
         next_state: np.ndarray,
         terminated: bool,
-        log_prob: torch.Tensor,
+        log_prob: Optional[torch.Tensor],
     ):
-        pass
+        pass  # Random agent doesn't store
 
     def update(
         self,
@@ -204,17 +215,37 @@ class PPOAgent(Agent):
         std = torch.exp(log_std)
         return Normal(action_mean, std)
 
-    def act(self, state: np.ndarray) -> tuple[np.ndarray, torch.Tensor]:
+    def act(self, state: np.ndarray) -> tuple[torch.Tensor, np.ndarray, torch.Tensor]:
+        """Returns: unclipped action tensor, clipped action numpy array, log prob tensor"""
         state_tensor = torch.FloatTensor(state).unsqueeze(0)
         with torch.no_grad():
             dist = self.get_distribution(state_tensor)
-            action = dist.sample()
-            log_prob = dist.log_prob(action).sum(dim=-1)
-        action_clipped = torch.clamp(action, self.action_low, self.action_high)
-        return action_clipped.squeeze(0).numpy(), log_prob
+            action_unclipped = dist.sample()  # Get the original UNCLIPPED action
+            log_prob = dist.log_prob(action_unclipped).sum(
+                dim=-1
+            )  # Log prob of UNCLIPPED action
+        # Clip the action *only* for interacting with the environment
+        action_clipped_tensor = torch.clamp(
+            action_unclipped, self.action_low, self.action_high
+        )
+        action_clipped_np = action_clipped_tensor.squeeze(0).numpy()
+        # Return the UNCLIPPED tensor, the CLIPPED numpy array, and the log_prob (of unclipped)
+        return action_unclipped.squeeze(0), action_clipped_np, log_prob.squeeze(0)
 
-    def store_transition(self, state, action, reward, next_state, terminated, log_prob):
-        self.buffer.append((state, action, reward, next_state, terminated, log_prob))
+    def store_transition(
+        self, state, action_unclipped, reward, next_state, terminated, log_prob
+    ):
+        """Stores the UNCLIPPED action tensor along with other data"""
+        # Ensure log_prob is not None before appending
+        if log_prob is None:
+            # This shouldn't happen if called correctly from main loop for PPOAgent
+            print(
+                "Warning: Trying to store transition with None log_prob for PPOAgent."
+            )
+            return
+        self.buffer.append(
+            (state, action_unclipped, reward, next_state, terminated, log_prob)
+        )
 
     def update(self, current_timestep: int, total_timesteps: int) -> None:
         if len(self.buffer) < self.buffer_capacity:
@@ -239,31 +270,26 @@ class PPOAgent(Agent):
         batch = list(self.buffer)
         # Clear buffer now that we have the data for this update cycle
         self.buffer.clear()
-        states, actions, rewards, next_states, terminateds, log_probs_old = zip(*batch)
+        states, actions_unclipped, rewards, next_states, terminateds, log_probs_old = (
+            zip(*batch)
+        )
 
         states_tensor = torch.FloatTensor(np.array(states))
-        actions_tensor = torch.FloatTensor(np.array(actions))
+        # Stack the UNCLIPPED action tensors stored in the buffer
+        actions_tensor = torch.stack(actions_unclipped)
         rewards_tensor = torch.FloatTensor(rewards).unsqueeze(1)
         next_states_tensor = torch.FloatTensor(np.array(next_states))
         terminateds_tensor = torch.FloatTensor(terminateds).unsqueeze(1)
-        log_probs_old_tensor = (
-            torch.stack(log_probs_old).detach().view(-1)
-        )  # Flatten log probs
+        log_probs_old_tensor = torch.stack(log_probs_old).detach().view(-1)  # Flatten
 
         # --- GAE Calculation ---
         with torch.no_grad():
-            values_old = self.critic(states_tensor).view(
-                -1
-            )  # Store values before update for clipping
+            values_old = self.critic(states_tensor).view(-1)
             next_values = self.critic(next_states_tensor).view(-1)
-            advantages = torch.zeros_like(rewards_tensor).view(
-                -1
-            )  # Flatten advantages buffer
+            advantages = torch.zeros_like(rewards_tensor).view(-1)
             last_gae_lam = 0
             for t in reversed(range(self.buffer_capacity)):
-                mask = (
-                    1.0 - terminateds_tensor[t].item()
-                )  # Use item() for scalar bool -> float
+                mask = 1.0 - terminateds_tensor[t].item()
                 delta = (
                     rewards_tensor[t].item()
                     + hp.gamma * next_values[t] * mask
@@ -272,35 +298,32 @@ class PPOAgent(Agent):
                 advantages[t] = last_gae_lam = (
                     delta + hp.gamma * hp.gae_lambda * last_gae_lam * mask
                 )
-            returns_tensor = advantages + values_old  # TD(lambda) returns
+            returns_tensor = advantages + values_old
 
         # --- PPO Update Loop with Mini-batches ---
         batch_indices = np.arange(self.buffer_capacity)
         for epoch in range(hp.update_epochs):
-            np.random.shuffle(batch_indices)  # Shuffle data each epoch
+            np.random.shuffle(batch_indices)
             for start in range(0, self.buffer_capacity, self.minibatch_size):
                 end = start + self.minibatch_size
                 mb_indices = batch_indices[start:end]
 
-                # --- Get Mini-batch Data ---
                 mb_states = states_tensor[mb_indices]
+                # Use the UNCLIPPED actions from the buffer for log_prob calculation
                 mb_actions = actions_tensor[mb_indices]
                 mb_log_probs_old = log_probs_old_tensor[mb_indices]
                 mb_advantages = advantages[mb_indices]
                 mb_returns = returns_tensor[mb_indices]
-                mb_values_old = values_old[
-                    mb_indices
-                ]  # Values before *any* updates this cycle
+                mb_values_old = values_old[mb_indices]
 
                 # --- Normalize Advantages (Per Mini-batch) ---
-                # Note: CleanRL often normalizes over the whole batch before epochs.
-                # Per-minibatch is specified in text, but can be unstable. Using per-MB here.
                 mb_advantages_normalized = (mb_advantages - mb_advantages.mean()) / (
                     mb_advantages.std() + 1e-8
                 )
 
-                # --- Recalculate log probabilities, values, entropy for Mini-batch ---
+                # --- Recalculate log probabilities (using UNCLIPPED actions) ---
                 dist = self.get_distribution(mb_states)
+                # Calculate log_prob of the *unclipped* actions stored in the buffer
                 log_probs_new = dist.log_prob(mb_actions).sum(dim=-1)
                 entropy = dist.entropy().mean()
                 values_new = self.critic(mb_states).view(-1)
@@ -317,12 +340,10 @@ class PPOAgent(Agent):
 
                 # --- Value Function Loss (Clipped) ---
                 v_loss_unclipped = F.mse_loss(values_new, mb_returns, reduction="none")
-                # Clip value estimate based on estimate *before this update cycle* (values_old)
                 v_clipped = mb_values_old + torch.clamp(
                     values_new - mb_values_old, -hp.clip_epsilon, hp.clip_epsilon
                 )
                 v_loss_clipped = F.mse_loss(v_clipped, mb_returns, reduction="none")
-                # Combine and apply value coefficient
                 critic_loss = 0.5 * torch.max(v_loss_unclipped, v_loss_clipped).mean()
 
                 # --- Actor Update with Grad Clipping ---
@@ -336,7 +357,6 @@ class PPOAgent(Agent):
 
                 # --- Critic Update with Grad Clipping ---
                 self.critic_optimizer.zero_grad()
-                # Scale critic loss by coefficient *before* backward
                 (critic_loss * hp.vf_coef).backward()
                 nn.utils.clip_grad_norm_(self.critic.parameters(), hp.max_grad_norm)
                 self.critic_optimizer.step()

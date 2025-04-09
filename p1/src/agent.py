@@ -79,18 +79,20 @@ class RandomAgent(Agent):
         return RandomAgent(env)
 
 
-class Actor(nn.Module):
+class ActorMean(nn.Module):
     def __init__(self, state_dim, action_dim):
         super().__init__()
         self.network = nn.Sequential(
             nn.Linear(state_dim, 64),
-            nn.ReLU(),
+            nn.Tanh(),
             nn.Linear(64, 64),
-            nn.ReLU(),
+            nn.Tanh(),
             nn.Linear(64, action_dim),
             nn.Tanh(),  # Tanh activation often used for continuous actions bounded [-1, 1]
             # Pendulum action space is [-2, 2], we'll scale later
         )
+        for param in self.network.parameters():
+            nn.init.normal_(param, 0, 0.0001)
 
     def forward(self, state):
         return self.network(state)
@@ -106,6 +108,8 @@ class Critic(nn.Module):
             nn.ReLU(),
             nn.Linear(64, 1),
         )
+        for param in self.network.parameters():
+            nn.init.normal_(param, 0, 0.01)
 
     def forward(self, state):
         return self.network(state)
@@ -143,10 +147,11 @@ class PPOAgent(Agent):
         state_dim = env.observation_space.shape[0]
         action_dim = env.action_space.shape[0]
 
-        self.actor = Actor(state_dim, action_dim)
+        self.actor_mean = ActorMean(state_dim, action_dim)
         self.actor_log_std = nn.Parameter(torch.zeros(1, action_dim))
+        nn.init.normal_(self.actor_log_std, 0, 0.0001)
         self.actor_optimizer = optim.Adam(
-            list(self.actor.parameters()) + [self.actor_log_std],
+            list(self.actor_mean.parameters()) + [self.actor_log_std],
             lr=hp.actor_lr,
         )
 
@@ -157,7 +162,7 @@ class PPOAgent(Agent):
         self.action_bias = (self.action_high + self.action_low) / 2.0
 
     def get_distribution(self, state: torch.Tensor) -> Normal:
-        action_mean_normalized = self.actor(state)
+        action_mean_normalized = self.actor_mean(state)
         log_std = self.actor_log_std.expand_as(action_mean_normalized)
         std = torch.exp(log_std)
         action_mean = action_mean_normalized * self.action_scale + self.action_bias
@@ -247,13 +252,15 @@ class PPOAgent(Agent):
 
     def save(self, path: Path) -> None:
         path.mkdir(parents=True, exist_ok=True)
-        torch.save(self.actor.state_dict(), path / "actor.pth")
+        torch.save(self.actor_mean.state_dict(), path / "actor_mean.pth")
+        torch.save(self.actor_log_std.data, path / "actor_log_std.pth")
         torch.save(self.critic.state_dict(), path / "critic.pth")
 
     @staticmethod
     def load(path: Path, run_config: RunConfig, env: gym.Env) -> "PPOAgent":
         agent = PPOAgent(run_config, env)
-        agent.actor.load_state_dict(torch.load(path / "actor.pth"))
+        agent.actor_mean.load_state_dict(torch.load(path / "actor_mean.pth"))
+        agent.actor_log_std.data = torch.load(path / "actor_log_std.pth")
         agent.critic.load_state_dict(torch.load(path / "critic.pth"))
         return agent
 

@@ -1,8 +1,9 @@
 import logging
+import time  # For tracking total steps
 
 import numpy as np
 import pandas as pd
-from agent import Agent, PPOAgent, get_agent
+from agent import Agent, PPOAgent, RandomAgent, get_agent  # Added RandomAgent
 from config import AGENT_DIR, RESULTS_DIR, VIDEO_DIR
 from run_config import CONFIGS, RunConfig
 from tqdm import tqdm
@@ -17,33 +18,48 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 class MetricsLogger:
     def __init__(self, run_config: RunConfig):
         self.run_config = run_config
-        self.episode_rewards = []
-        self.progress_bar = tqdm(total=run_config.num_episodes, desc="Running episodes")
+        self.all_rewards = []
+        self.all_lengths = []
+        self.current_episode_reward = 0
+        self.current_episode_length = 0
+        self.progress_bar = tqdm(
+            total=run_config.total_timesteps, desc="Training Steps"
+        )
         RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    def init_episode(self):
-        self.episode_rewards.append(0)
+    def start_episode(self):
+        self.current_episode_reward = 0
+        self.current_episode_length = 0
 
     def end_episode(self):
-        self.progress_bar.update(1)
-        self.progress_bar.desc = f"Reward: {self.episode_rewards[-1]}"
+        self.all_rewards.append(self.current_episode_reward)
+        self.all_lengths.append(self.current_episode_length)
+        avg_reward = np.mean(self.all_rewards[-10:]) if self.all_rewards else 0
+        self.progress_bar.set_description(
+            f"Steps | Avg Reward (last 10): {avg_reward:.2f}"
+        )
 
-    def update(self, reward: float):
-        self.episode_rewards[-1] += reward
+    def step(self, reward: float, steps_added: int = 1):
+        self.current_episode_reward += reward
+        self.current_episode_length += steps_added
+        self.progress_bar.update(steps_added)
 
     def store_results(self):
-        pd.DataFrame(self.episode_rewards).to_csv(
-            RESULTS_DIR / f"{self.run_config.id:02d}.csv", index=False
-        )
+        df = pd.DataFrame({"rewards": self.all_rewards, "lengths": self.all_lengths})
+        df.to_csv(RESULTS_DIR / f"{self.run_config.id:02d}.csv", index_label="episode")
 
     def close(self):
         self.progress_bar.close()
 
 
 def wrap_env(env: gym.Env, run_config: RunConfig):
-    if type(run_config.record_episode_spacing) == int:
+    env = RecordEpisodeStatistics(env)
+    if (
+        run_config.record_episode_spacing is not None
+        and run_config.record_episode_spacing > 0
+    ):
         episode_trigger = (
-            lambda episode: episode % run_config.record_episode_spacing == 0
+            lambda episode_id: episode_id % run_config.record_episode_spacing == 0
         )
         VIDEO_DIR.mkdir(parents=True, exist_ok=True)
         env = RecordVideo(
@@ -52,95 +68,84 @@ def wrap_env(env: gym.Env, run_config: RunConfig):
             episode_trigger=episode_trigger,
             name_prefix=f"run-{run_config.id:02d}",
         )
-    return RecordEpisodeStatistics(env)
+    return env
 
 
 def get_env(run_config: RunConfig):
-    if run_config.env_name == "Pendulum-v1":
-        return wrap_env(gym.make("Pendulum-v1", render_mode="rgb_array"), run_config)
-    elif run_config.env_name == "InvertedPendulum-v5":
-        return wrap_env(
-            gym.make("InvertedPendulum-v5", render_mode="rgb_array"), run_config
-        )
-    elif run_config.env_name == "Ant-v5":
-        env = gym.make("Ant-v5", render_mode="rgb_array")
-        # env = gym.wrappers.ClipAction(env)
-        env = gym.wrappers.NormalizeObservation(env)
-        env = gym.wrappers.TransformObservation(
-            env, lambda obs: np.clip(obs, -10, 10), env.observation_space
-        )
-        env = gym.wrappers.NormalizeReward(env)
-        env = gym.wrappers.TransformReward(
-            env, lambda reward: np.clip(float(reward), -10, 10)
-        )
-        return wrap_env(env, run_config)
-    elif run_config.env_name == "Humanoid-v5":
-        return wrap_env(gym.make("Humanoid-v5", render_mode="rgb_array"), run_config)
-    else:
-        raise ValueError(f"Environment {run_config.env_name} not found")
+    env = gym.make(run_config.env_name, render_mode="rgb_array")
+    env = gym.wrappers.FlattenObservation(env)
+    env = gym.wrappers.NormalizeObservation(env)
+    env = gym.wrappers.TransformObservation(
+        env, lambda obs: np.clip(obs, -10, 10), observation_space=env.observation_space
+    )
+    env = gym.wrappers.NormalizeReward(
+        env,
+        gamma=run_config.ppo_hyperparams.gamma if run_config.ppo_hyperparams else 0.99,
+    )
+    env = gym.wrappers.TransformReward(
+        env, lambda reward: np.clip(float(reward), -10, 10)
+    )
 
-
-def run_episode(
-    run_config: RunConfig,
-    env: gym.Env,
-    agent: Agent,
-    episode: int,
-    num_steps: int,
-    metrics_logger: MetricsLogger,
-):
-    state, _ = env.reset()
-    step = 0
-    terminated = False
-    truncated = False
-    metrics_logger.init_episode()
-    while not terminated and not truncated and step < num_steps:
-        action_np, log_prob_tensor = agent.act(state)
-        next_state, reward, terminated, truncated, info = env.step(action_np)
-        agent.store_transition(
-            state, action_np, float(reward), next_state, terminated, log_prob_tensor
-        )
-        state = next_state
-        step += 1
-        metrics_logger.update(float(reward))
-    metrics_logger.end_episode()
+    env = wrap_env(env, run_config)
+    return env
 
 
 def run_experiment(run_config: RunConfig):
+    start_time = time.time()
     env = get_env(run_config)
     agent = get_agent(run_config, env)
-
     is_trainable = isinstance(agent, PPOAgent)
+
+    print(
+        f"Running experiment '{run_config.name}' on {run_config.env_name} for {run_config.total_timesteps} steps..."
+    )
     if is_trainable:
-        if run_config.ppo_hyperparams is None:
-            raise ValueError("Trainable PPOAgent requires ppo_hyperparams in RunConfig")
+        hp = run_config.ppo_hyperparams
+        if hp is None:
+            raise ValueError("PPOAgent needs hyperparameters")
         print(
-            f"Running {run_config.num_episodes} episodes, updating every {run_config.ppo_hyperparams.num_episodes_per_update} episodes."
+            f"  Agent: PPO, Rollout Length: {run_config.num_steps}, Mini-batch Size: {agent.minibatch_size}, Update Epochs: {hp.update_epochs}"
         )
     else:
-        print(
-            f"Running {run_config.num_episodes} episodes with non-trainable agent {run_config.agent_name}."
-        )
+        print(f"  Agent: {run_config.agent_name} (Not training)")
 
     metrics_logger = MetricsLogger(run_config)
+    global_step = 0
+    state, info = env.reset(seed=run_config.seed)
+    metrics_logger.start_episode()
 
-    for episode in range(run_config.num_episodes):
-        run_episode(
-            run_config, env, agent, episode, run_config.num_steps, metrics_logger
-        )
+    while global_step < run_config.total_timesteps:
+        action_np, log_prob_tensor = agent.act(state)
 
-        if run_config.ppo_hyperparams is None:
-            raise ValueError("Trainable PPOAgent requires ppo_hyperparams in RunConfig")
-        if (
-            (episode + 1) % run_config.ppo_hyperparams.num_episodes_per_update == 0
-            or episode == run_config.num_episodes - 1
-        ):
-            agent.update()
+        next_state, reward, terminated, truncated, info = env.step(action_np)
+        global_step += 1
+        metrics_logger.step(float(reward))
+
+        if is_trainable:
+            agent.store_transition(
+                state, action_np, float(reward), next_state, terminated, log_prob_tensor
+            )
+
+        state = next_state
+
+        if terminated or truncated:
+            metrics_logger.end_episode()
+            state, info = env.reset()
+            metrics_logger.start_episode()
+
+        if is_trainable:
+            agent.update(global_step, run_config.total_timesteps)
 
     metrics_logger.store_results()
     metrics_logger.close()
-    save_path = AGENT_DIR / f"{run_config.id:02d}"
-    agent.save(save_path)
-    print(f"Agent saved to {save_path}")
+    env.close()
+
+    if hasattr(agent, "save"):
+        save_path = AGENT_DIR / f"{run_config.id:02d}"
+        agent.save(save_path)
+        print(f"Agent saved to {save_path}")
+
+    print(f"Experiment finished in {(time.time() - start_time):.2f} seconds.")
 
 
 def main():

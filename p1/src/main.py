@@ -73,6 +73,15 @@ def wrap_env(env: gym.Env, run_config: RunConfig):
 
 def get_env(run_config: RunConfig):
     env = gym.make(run_config.env_name, render_mode="rgb_array")
+
+    if run_config.max_episode_steps is not None:
+        print(
+            f"Applying TimeLimit wrapper with max_episode_steps={run_config.max_episode_steps}"
+        )
+        env = gym.wrappers.TimeLimit(
+            env, max_episode_steps=run_config.max_episode_steps
+        )
+
     env = gym.wrappers.FlattenObservation(env)
     env = gym.wrappers.NormalizeObservation(env)
     env = gym.wrappers.TransformObservation(

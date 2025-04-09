@@ -34,6 +34,7 @@ class RunConfig:
     num_steps: int = (
         2048  # Steps per environment per rollout (renamed from buffer_capacity in PPOHyperparams)
     )
+    max_episode_steps: Optional[int] = None
     seed: Optional[int] = None
     record_episode_spacing: Optional[int] = None
     ppo_hyperparams: Optional[PPOHyperparams] = None
@@ -73,6 +74,7 @@ CONFIGS = [
         agent_name="ppo",
         record_episode_spacing=500,
         total_timesteps=500_000,
+        max_episode_steps=200,
         ppo_hyperparams=PPOHyperparams(
             actor_lr=3e-4,
             critic_lr=1e-3,
@@ -85,6 +87,7 @@ CONFIGS = [
         agent_name="ppo",
         record_episode_spacing=500,
         total_timesteps=200_000,
+        max_episode_steps=200,
         ppo_hyperparams=PPOHyperparams(
             actor_lr=3e-4,
             critic_lr=1e-3,
@@ -97,6 +100,7 @@ CONFIGS = [
         agent_name="ppo",
         record_episode_spacing=500,
         total_timesteps=800_000,
+        max_episode_steps=400,
         ppo_hyperparams=PPOHyperparams(
             actor_lr=3e-4,
             critic_lr=1e-3,

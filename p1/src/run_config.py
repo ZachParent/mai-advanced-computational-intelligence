@@ -14,7 +14,6 @@ class PPOHyperparams:
     buffer_capacity: int = (
         2048  # Steps collected per update (often num_envs * num_steps_per_env)
     )
-    # num_episodes_per_update: int = ? # This is now implicitly controlled by buffer_capacity
 
     # New hyperparameters based on principles
     adam_epsilon: float = 1e-5  # Adam epsilon parameter
@@ -31,15 +30,12 @@ class RunConfig:
     name: str
     env_name: Literal["Pendulum-v1", "InvertedPendulum-v5", "Ant-v5", "Humanoid-v5"]
     agent_name: Literal["random", "ppo"]
-    num_episodes: Optional[int] = (
-        None  # Training often runs for total timesteps, not episodes
-    )
     total_timesteps: int = 1_000_000  # Define total steps for training completion
     num_steps: int = (
         2048  # Steps per environment per rollout (renamed from buffer_capacity in PPOHyperparams)
     )
     seed: Optional[int] = None
-    record_episode_spacing: Optional[int] = 100
+    record_episode_spacing: Optional[int] = None
     ppo_hyperparams: Optional[PPOHyperparams] = None
 
     def __post_init__(self):
@@ -67,74 +63,43 @@ class RunConfig:
             print(
                 f"Warning: ppo_hyperparams provided for non-PPO agent '{self.agent_name}', will be ignored."
             )
-        if self.num_episodes is not None:
-            print(
-                "Warning: num_episodes is set but training is controlled by total_timesteps."
-            )
 
 
-# --- Example CONFIGS using new structure ---
-# Note: num_steps is now the rollout length per update cycle.
-# Total training length is determined by total_timesteps.
 CONFIGS = [
-    # RunConfig(
-    #     id=0,
-    #     name="Pendulum-v1-ppo low lr",
-    #     env_name="Pendulum-v1",
-    #     agent_name="ppo",
-    #     ppo_hyperparams=PPOHyperparams(
-    #         actor_lr=1e-4,
-    #         critic_lr=1e-3,
-    #     ),
-    # ),
-    # RunConfig(
-    #     id=1,
-    #     name="Pendulum-v1-ppo high lr",
-    #     env_name="Pendulum-v1",
-    #     agent_name="ppo",
-    #     ppo_hyperparams=PPOHyperparams(
-    #         actor_lr=5e-3,
-    #         critic_lr=5e-2,
-    #     ),
-    # ),
-    # RunConfig(
-    #     id=2,
-    #     name="Pendulum-v1-ppo balanced lr",
-    #     env_name="Pendulum-v1",
-    #     agent_name="ppo",
-    #     ppo_hyperparams=PPOHyperparams(
-    #         actor_lr=5e-3,
-    #         critic_lr=1e-2,
-    #     ),
-    # ),
-    # RunConfig(
-    #     id=3,
-    #     name="InvertedPendulum-v5-ppo",
-    #     env_name="InvertedPendulum-v5",
-    #     agent_name="ppo",
-    #     num_episodes=2000,
-    #     record_episode_spacing=500,
-    #     ppo_hyperparams=PPOHyperparams(
-    #         actor_lr=5e-3,
-    #         critic_lr=1e-2,
-    #     ),
-    # ),
+    RunConfig(
+        id=2,
+        name="Pendulum-v1-ppo balanced lr",
+        env_name="Pendulum-v1",
+        agent_name="ppo",
+        record_episode_spacing=500,
+        total_timesteps=500_000,
+        ppo_hyperparams=PPOHyperparams(
+            actor_lr=3e-4,
+            critic_lr=1e-3,
+        ),
+    ),
+    RunConfig(
+        id=3,
+        name="InvertedPendulum-v5-ppo",
+        env_name="InvertedPendulum-v5",
+        agent_name="ppo",
+        record_episode_spacing=500,
+        total_timesteps=200_000,
+        ppo_hyperparams=PPOHyperparams(
+            actor_lr=3e-4,
+            critic_lr=1e-3,
+        ),
+    ),
     RunConfig(
         id=4,
         name="Ant-v5-ppo",
         env_name="Ant-v5",
         agent_name="ppo",
-        total_timesteps=1_000_000,  # Example total steps
-        num_steps=2048,  # Steps per rollout
-        record_episode_spacing=500,  # Record every N episodes completed during training
+        record_episode_spacing=500,
+        total_timesteps=800_000,
         ppo_hyperparams=PPOHyperparams(
             actor_lr=3e-4,
             critic_lr=1e-3,
-            num_minibatches=32,
-            update_epochs=10,
-            # buffer_capacity will be num_steps (2048)
-            # entropy_coef=0.01 # Can try adding entropy bonus
         ),
     ),
-    # Add other configs similarly...
 ]

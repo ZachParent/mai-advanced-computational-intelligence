@@ -18,7 +18,7 @@ class PPOHyperparams:
 class RunConfig:
     id: int
     name: str
-    env_name: Literal["Pendulum-v1", "InvertedPendulum-v5", "Humanoid-v5"]
+    env_name: Literal["Pendulum-v1", "InvertedPendulum-v5", "Ant-v5", "Humanoid-v5"]
     agent_name: Literal["random", "ppo"]
     num_episodes: int = 1000
     num_steps: int = 400
@@ -80,14 +80,31 @@ CONFIGS = [
     # ),
     RunConfig(
         id=4,
-        name="Humanoid-v5-ppo",
-        env_name="Humanoid-v5",
+        name="Ant-v5-ppo",
+        env_name="Ant-v5",
         agent_name="ppo",
-        num_episodes=50000,
-        record_episode_spacing=10000,
+        num_episodes=100000,
+        record_episode_spacing=2000,
         ppo_hyperparams=PPOHyperparams(
-            actor_lr=1e-4,
-            critic_lr=1e-3,
+            actor_lr=5e-3,
+            critic_lr=1e-1,
+            clip_epsilon=0.1,
+            buffer_capacity=10000,
+            num_episodes_per_update=200,
+            update_epochs=20,
         ),
     ),
+    # RunConfig(
+    #     id=5,
+    #     name="Humanoid-v5-ppo",
+    #     env_name="Humanoid-v5",
+    #     agent_name="ppo",
+    #     num_episodes=100000,
+    #     record_episode_spacing=10000,
+    #     ppo_hyperparams=PPOHyperparams(
+    #         actor_lr=5e-3,
+    #         critic_lr=5e-2,
+    #         clip_epsilon=0.1,
+    #     ),
+    # ),
 ]

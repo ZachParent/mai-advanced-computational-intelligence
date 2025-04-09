@@ -106,4 +106,17 @@ CONFIGS = [
             critic_lr=1e-3,
         ),
     ),
+    RunConfig(
+        id=5,
+        name="Humanoid-v5-ppo",
+        env_name="Humanoid-v5",
+        agent_name="ppo",
+        record_episode_spacing=500,
+        total_timesteps=1_000_000,
+        max_episode_steps=400,
+        ppo_hyperparams=PPOHyperparams(
+            actor_lr=3e-4,
+            critic_lr=1e-3,
+        ),
+    ),
 ]

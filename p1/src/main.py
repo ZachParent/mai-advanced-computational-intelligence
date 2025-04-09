@@ -1,5 +1,6 @@
 import logging
 
+import numpy as np
 import pandas as pd
 from agent import Agent, PPOAgent, get_agent
 from config import AGENT_DIR, RESULTS_DIR, VIDEO_DIR
@@ -62,17 +63,17 @@ def get_env(run_config: RunConfig):
             gym.make("InvertedPendulum-v5", render_mode="rgb_array"), run_config
         )
     elif run_config.env_name == "Ant-v5":
-        # env = gym.make("Ant-v5", render_mode="rgb_array")
+        env = gym.make("Ant-v5", render_mode="rgb_array")
         # env = gym.wrappers.ClipAction(env)
-        # env = gym.wrappers.NormalizeObservation(env)
-        # env = gym.wrappers.TransformObservation(
-        #     env, lambda obs: np.clip(obs, -10, 10), env.observation_space
-        # )
-        # env = gym.wrappers.NormalizeReward(env)
-        # env = gym.wrappers.TransformReward(
-        #     env, lambda reward: np.clip(float(reward), -10, 10)
-        # )
-        return wrap_env(gym.make("Ant-v5", render_mode="rgb_array"), run_config)
+        env = gym.wrappers.NormalizeObservation(env)
+        env = gym.wrappers.TransformObservation(
+            env, lambda obs: np.clip(obs, -10, 10), env.observation_space
+        )
+        env = gym.wrappers.NormalizeReward(env)
+        env = gym.wrappers.TransformReward(
+            env, lambda reward: np.clip(float(reward), -10, 10)
+        )
+        return wrap_env(env, run_config)
     elif run_config.env_name == "Humanoid-v5":
         return wrap_env(gym.make("Humanoid-v5", render_mode="rgb_array"), run_config)
     else:

@@ -3,6 +3,7 @@ from collections import deque
 from pathlib import Path
 from typing import Optional
 
+import einops
 import numpy as np
 import torch
 import torch.nn as nn
@@ -14,7 +15,7 @@ from torch.distributions import Normal
 import gymnasium as gym
 
 
-# --- Helper for Orthogonal Initialization ---
+# Orthogonal Initialization
 def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     torch.nn.init.orthogonal_(layer.weight, std)
     torch.nn.init.constant_(layer.bias, bias_const)
@@ -31,7 +32,7 @@ class Agent(ABC):
     def act(
         self, state: np.ndarray
     ) -> tuple[torch.Tensor, np.ndarray, Optional[torch.Tensor]]:
-        """Returns unclipped action tensor, clipped action numpy array, optional log prob tensor."""
+        """Returns: unclipped action tensor, clipped action numpy array, log prob tensor"""
 
     @abstractmethod
     def store_transition(
@@ -68,13 +69,12 @@ class RandomAgent(Agent):
         self, state: np.ndarray
     ) -> tuple[torch.Tensor, np.ndarray, Optional[torch.Tensor]]:
         action_np = self.env.action_space.sample()
-        # For random agent, clipped and unclipped are the same, return as tensor/numpy
         action_tensor = torch.tensor(action_np, dtype=torch.float32)
         return (
             action_tensor,
             action_np,
             None,
-        )  # Unclipped Tensor, Clipped Numpy, No log_prob
+        )
 
     def store_transition(
         self,
@@ -92,10 +92,10 @@ class RandomAgent(Agent):
         current_timestep: int,
         total_timesteps: int,
     ):
-        pass
+        pass  # Random agent doesn't update
 
     def save(self, path: Path) -> None:
-        pass
+        pass  # Random agent doesn't save
 
     @staticmethod
     def load(path: Path, run_config: RunConfig, env: gym.Env) -> "RandomAgent":
@@ -105,12 +105,10 @@ class RandomAgent(Agent):
 class ActorMean(nn.Module):
     def __init__(self, state_dim, action_dim):
         super().__init__()
-        # Orthogonal initialization with gain sqrt(2) for hidden layers
-        # Bias 0
+        # Orthogonal initialization with weight std sqrt(2) and bias 0 for hidden layers
         self.fc1 = layer_init(nn.Linear(state_dim, 64))
         self.fc2 = layer_init(nn.Linear(64, 64))
-        # Orthogonal initialization with gain 0.01 for output layer
-        # Bias 0
+        # Orthogonal initialization with weight std 0.01 and bias 0 for output layer
         self.fc_mean = layer_init(nn.Linear(64, action_dim), std=0.01)
 
     def forward(self, state):
@@ -123,16 +121,14 @@ class ActorMean(nn.Module):
 class Critic(nn.Module):
     def __init__(self, state_dim):
         super().__init__()
-        # Orthogonal initialization with gain sqrt(2) for hidden layers
-        # Bias 0
+        # Orthogonal initialization with weight std sqrt(2) and bias 0 for hidden layers
         self.fc1 = layer_init(nn.Linear(state_dim, 64))
         self.fc2 = layer_init(nn.Linear(64, 64))
-        # Orthogonal initialization with gain 1.0 for output layer
-        # Bias 0
+        # Orthogonal initialization with weight std 1.0 and bias 0 for output layer
         self.fc_value = layer_init(nn.Linear(64, 1), std=1.0)
 
     def forward(self, state):
-        x = torch.tanh(self.fc1(state))  # Using tanh based on CleanRL MuJoCo examples
+        x = torch.tanh(self.fc1(state))
         x = torch.tanh(self.fc2(x))
         value = self.fc_value(x)
         return value
@@ -149,10 +145,9 @@ class PPOAgent(Agent):
 
         if self.run_config.ppo_hyperparams is None:
             raise ValueError("PPOAgent requires ppo_hyperparams in RunConfig")
-        hp: PPOHyperparams = self.run_config.ppo_hyperparams  # Type hint for clarity
+        hp: PPOHyperparams = self.run_config.ppo_hyperparams
 
-        # --- Calculate buffer size based on RunConfig num_steps ---
-        # Assuming 1 environment for now
+        # Assuming 1 environment for now, could parallelize later
         num_envs = 1
         self.buffer_capacity = num_envs * self.run_config.num_steps
         if self.buffer_capacity % hp.num_minibatches != 0:
@@ -161,7 +156,7 @@ class PPOAgent(Agent):
             )
         self.minibatch_size = self.buffer_capacity // hp.num_minibatches
 
-        # --- Store hyperparameters ---
+        # Hyperparameters
         self.clip_epsilon = hp.clip_epsilon
         self.update_epochs = hp.update_epochs
         self.gae_lambda = hp.gae_lambda
@@ -170,7 +165,10 @@ class PPOAgent(Agent):
         self.max_grad_norm = hp.max_grad_norm
         self.use_lr_annealing = hp.use_lr_annealing
 
-        self.buffer = deque(maxlen=self.buffer_capacity)
+        # Buffer of tuples of (state, action_unclipped, reward, next_state, terminated, log_prob)
+        self.buffer: deque[
+            tuple[np.ndarray, torch.Tensor, float, np.ndarray, bool, torch.Tensor]
+        ] = deque(maxlen=self.buffer_capacity)
 
         if not isinstance(env.action_space, gym.spaces.Box):
             raise ValueError("PPOAgent only supports Box spaces.")
@@ -187,16 +185,15 @@ class PPOAgent(Agent):
         )  # Initialize log_std to 0
         self.critic = Critic(state_dim)
 
-        # --- Optimizers with Adam Epsilon ---
         self.actor_optimizer = optim.Adam(
             list(self.actor_mean.parameters()) + [self.actor_log_std],
             lr=hp.actor_lr,
-            eps=hp.adam_epsilon,  # Adam Epsilon
+            eps=hp.adam_epsilon,
         )
         self.critic_optimizer = optim.Adam(
             self.critic.parameters(),
             lr=hp.critic_lr,
-            eps=hp.adam_epsilon,  # Adam Epsilon
+            eps=hp.adam_epsilon,
         )
 
         # Action scaling depends on the environment's action space range
@@ -206,43 +203,39 @@ class PPOAgent(Agent):
         self.action_bias = (self.action_high + self.action_low) / 2.0
 
     def get_distribution(self, state: torch.Tensor) -> Normal:
-        # Actor outputs mean in range [-1, 1] due to init/layer structure
+        # Actor outputs mean in range [-1, 1]
         action_mean_normalized = self.actor_mean(state)
         # Scale mean to environment's action space range
         action_mean = action_mean_normalized * self.action_scale + self.action_bias
-
-        log_std = self.actor_log_std.expand_as(action_mean)  # Ensure shape matches mean
-        std = torch.exp(log_std)
+        std = torch.exp(self.actor_log_std)
         return Normal(action_mean, std)
 
     def act(self, state: np.ndarray) -> tuple[torch.Tensor, np.ndarray, torch.Tensor]:
         """Returns: unclipped action tensor, clipped action numpy array, log prob tensor"""
-        state_tensor = torch.FloatTensor(state).unsqueeze(0)
+        state_tensor = torch.FloatTensor(state)
         with torch.no_grad():
             dist = self.get_distribution(state_tensor)
-            action_unclipped = dist.sample()  # Get the original UNCLIPPED action
-            log_prob = dist.log_prob(action_unclipped).sum(
-                dim=-1
-            )  # Log prob of UNCLIPPED action
+            action_unclipped = einops.rearrange(dist.sample(), "1 action -> action")
+            log_prob = einops.reduce(
+                dist.log_prob(action_unclipped), "1 action -> ()", reduction="sum"
+            )
         # Clip the action *only* for interacting with the environment
-        action_clipped_tensor = torch.clamp(
+        action_clipped = torch.clamp(
             action_unclipped, self.action_low, self.action_high
         )
-        action_clipped_np = action_clipped_tensor.squeeze(0).numpy()
         # Return the UNCLIPPED tensor, the CLIPPED numpy array, and the log_prob (of unclipped)
-        return action_unclipped.squeeze(0), action_clipped_np, log_prob.squeeze(0)
+        return action_unclipped, action_clipped.numpy(), log_prob
 
     def store_transition(
-        self, state, action_unclipped, reward, next_state, terminated, log_prob
+        self,
+        state: np.ndarray,
+        action_unclipped: torch.Tensor,
+        reward: float,
+        next_state: np.ndarray,
+        terminated: bool,
+        log_prob: torch.Tensor,
     ):
         """Stores the UNCLIPPED action tensor along with other data"""
-        # Ensure log_prob is not None before appending
-        if log_prob is None:
-            # This shouldn't happen if called correctly from main loop for PPOAgent
-            print(
-                "Warning: Trying to store transition with None log_prob for PPOAgent."
-            )
-            return
         self.buffer.append(
             (state, action_unclipped, reward, next_state, terminated, log_prob)
         )
@@ -251,14 +244,12 @@ class PPOAgent(Agent):
         if len(self.buffer) < self.buffer_capacity:
             # Don't update if buffer isn't full yet (wait for full rollout)
             return
-        if len(self.buffer) == 0:  # Should be caught by above, but safe check
-            return
 
         hp = self.run_config.ppo_hyperparams
         if hp is None:
             raise ValueError("Missing ppo_hyperparams")
 
-        # --- Learning Rate Annealing ---
+        # Learning Rate Annealing
         if self.use_lr_annealing:
             frac = 1.0 - (current_timestep / total_timesteps)
             lr_now = frac * hp.actor_lr
@@ -266,7 +257,7 @@ class PPOAgent(Agent):
             lr_now_critic = frac * hp.critic_lr
             self.critic_optimizer.param_groups[0]["lr"] = lr_now_critic
 
-        # --- Prepare Batch Data ---
+        # Prepare Batch Data
         batch = list(self.buffer)
         # Clear buffer now that we have the data for this update cycle
         self.buffer.clear()
@@ -274,15 +265,23 @@ class PPOAgent(Agent):
             zip(*batch)
         )
 
-        states_tensor = torch.FloatTensor(np.array(states))
+        states_tensor = einops.rearrange(
+            torch.FloatTensor(np.array(states)), "step dim -> step dim"
+        )
         # Stack the UNCLIPPED action tensors stored in the buffer
-        actions_tensor = torch.stack(actions_unclipped)
-        rewards_tensor = torch.FloatTensor(rewards).unsqueeze(1)
-        next_states_tensor = torch.FloatTensor(np.array(next_states))
-        terminateds_tensor = torch.FloatTensor(terminateds).unsqueeze(1)
-        log_probs_old_tensor = torch.stack(log_probs_old).detach().view(-1)  # Flatten
+        actions_tensor = einops.rearrange(
+            torch.stack(actions_unclipped), "step action -> step action"
+        )
+        rewards_tensor = einops.rearrange(torch.FloatTensor(rewards), "step -> step 1")
+        next_states_tensor = einops.rearrange(
+            torch.FloatTensor(np.array(next_states)), "step dim -> step dim"
+        )
+        terminateds_tensor = einops.rearrange(
+            torch.FloatTensor(terminateds), "step -> step 1"
+        )
+        log_probs_old_tensor = torch.stack(log_probs_old).detach().view(-1)
 
-        # --- GAE Calculation ---
+        # GAE Calculation
         with torch.no_grad():
             values_old = self.critic(states_tensor).view(-1)
             next_values = self.critic(next_states_tensor).view(-1)

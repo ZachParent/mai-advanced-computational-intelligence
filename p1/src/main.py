@@ -3,7 +3,7 @@ import time  # For tracking total steps
 
 import numpy as np
 import pandas as pd
-from agent import Agent, PPOAgent, RandomAgent, get_agent  # Added RandomAgent
+from agent import Agent, PPOAgent, RandomAgent
 from config import AGENT_DIR, RESULTS_DIR, VIDEO_DIR
 from run_config import CONFIGS, RunConfig
 from tqdm import tqdm
@@ -97,6 +97,15 @@ def get_env(run_config: RunConfig):
 
     env = wrap_env(env, run_config)
     return env
+
+
+def get_agent(run_config: RunConfig, env: gym.Env) -> Agent:
+    if run_config.agent_name == "random":
+        return RandomAgent(run_config=run_config, env=env)
+    elif run_config.agent_name == "ppo":
+        return PPOAgent(run_config=run_config, env=env)
+    else:
+        raise ValueError(f"Agent {run_config.agent_name} not found")
 
 
 def run_experiment(run_config: RunConfig):

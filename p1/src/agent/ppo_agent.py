@@ -1,7 +1,5 @@
-from abc import ABC, abstractmethod
 from collections import deque
 from pathlib import Path
-from typing import Optional
 
 import einops
 import numpy as np
@@ -9,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from agent import Agent
 from run_config import PPOHyperparams, RunConfig
 from torch.distributions import Normal
 
@@ -20,86 +19,6 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     torch.nn.init.orthogonal_(layer.weight, std)
     torch.nn.init.constant_(layer.bias, bias_const)
     return layer
-
-
-class Agent(ABC):
-    env: gym.Env
-
-    def __init__(self, env: gym.Env):
-        self.env = env
-
-    @abstractmethod
-    def act(
-        self, state: np.ndarray
-    ) -> tuple[torch.Tensor, np.ndarray, Optional[torch.Tensor]]:
-        """Returns: unclipped action tensor, clipped action numpy array, log prob tensor"""
-
-    @abstractmethod
-    def store_transition(
-        self,
-        state: np.ndarray,
-        action_unclipped: torch.Tensor,
-        reward: float,
-        next_state: np.ndarray,
-        terminated: bool,
-        log_prob: Optional[torch.Tensor],
-    ):
-        pass
-
-    @abstractmethod
-    def update(
-        self,
-        current_timestep: int,
-        total_timesteps: int,
-    ):
-        pass
-
-    @abstractmethod
-    def save(self, path: Path):
-        pass
-
-    @staticmethod
-    @abstractmethod
-    def load(path: Path, run_config: RunConfig, env: gym.Env) -> "Agent":
-        pass
-
-
-class RandomAgent(Agent):
-    def act(
-        self, state: np.ndarray
-    ) -> tuple[torch.Tensor, np.ndarray, Optional[torch.Tensor]]:
-        action_np = self.env.action_space.sample()
-        action_tensor = torch.tensor(action_np, dtype=torch.float32)
-        return (
-            action_tensor,
-            action_np,
-            None,
-        )
-
-    def store_transition(
-        self,
-        state: np.ndarray,
-        action_unclipped: torch.Tensor,
-        reward: float,
-        next_state: np.ndarray,
-        terminated: bool,
-        log_prob: Optional[torch.Tensor],
-    ):
-        pass  # Random agent doesn't store
-
-    def update(
-        self,
-        current_timestep: int,
-        total_timesteps: int,
-    ):
-        pass  # Random agent doesn't update
-
-    def save(self, path: Path) -> None:
-        pass  # Random agent doesn't save
-
-    @staticmethod
-    def load(path: Path, run_config: RunConfig, env: gym.Env) -> "RandomAgent":
-        return RandomAgent(env)
 
 
 class ActorMean(nn.Module):
@@ -140,7 +59,7 @@ class PPOAgent(Agent):
         run_config: RunConfig,
         env: gym.Env,
     ):
-        super().__init__(env)
+        super().__init__(run_config, env)
         self.run_config = run_config
 
         if self.run_config.ppo_hyperparams is None:
@@ -375,12 +294,3 @@ class PPOAgent(Agent):
         agent.actor_log_std = torch.load(path / "actor_log_std.pth")
         agent.critic.load_state_dict(torch.load(path / "critic.pth"))
         return agent
-
-
-def get_agent(run_config: RunConfig, env: gym.Env):
-    if run_config.agent_name == "random":
-        return RandomAgent(env)
-    elif run_config.agent_name == "ppo":
-        return PPOAgent(run_config=run_config, env=env)
-    else:
-        raise ValueError(f"Agent {run_config.agent_name} not found")

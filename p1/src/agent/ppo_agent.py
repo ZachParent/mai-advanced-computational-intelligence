@@ -60,7 +60,6 @@ class PPOAgent(Agent):
         env: gym.Env,
     ):
         super().__init__(run_config, env)
-        self.run_config = run_config
 
         if self.run_config.ppo_hyperparams is None:
             raise ValueError("PPOAgent requires ppo_hyperparams in RunConfig")

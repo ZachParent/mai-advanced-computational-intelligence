@@ -1,8 +1,9 @@
-import logging
+import random
 import time  # For tracking total steps
 
 import numpy as np
 import pandas as pd
+import torch  # Import torch
 from agent import Agent, PPOAgent, RandomAgent
 from config import AGENT_DIR, RESULTS_DIR, VIDEO_DIR
 from run_config import CONFIGS, RunConfig
@@ -10,9 +11,6 @@ from tqdm import tqdm
 
 import gymnasium as gym
 from gymnasium.wrappers import RecordEpisodeStatistics, RecordVideo
-
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
 class MetricsLogger:
@@ -110,13 +108,18 @@ def get_agent(run_config: RunConfig, env: gym.Env) -> Agent:
 
 def run_experiment(run_config: RunConfig):
     start_time = time.time()
+
+    if run_config.seed is not None:
+        print(f"Setting seed: {run_config.seed}")
+        random.seed(run_config.seed)
+        np.random.seed(run_config.seed)
+        torch.manual_seed(run_config.seed)
+        torch.backends.cudnn.deterministic = True
+
     env = get_env(run_config)
     agent = get_agent(run_config, env)
     is_trainable = isinstance(agent, PPOAgent)
 
-    print(
-        f"Running experiment '{run_config.name}' on {run_config.env_name} for {run_config.total_timesteps} steps..."
-    )
     if is_trainable:
         hp = run_config.ppo_hyperparams
         if hp is None:
@@ -175,7 +178,7 @@ def run_experiment(run_config: RunConfig):
 def main():
     for run_config in CONFIGS:
         print("=" * 80)
-        logger.info(f"Experiment {run_config.id}: {run_config.name}".center(80))
+        print(f"Experiment {run_config.id}: {run_config.name}".center(80))
         run_experiment(run_config)
 
 

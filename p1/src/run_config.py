@@ -30,6 +30,7 @@ class RunConfig:
     name: str
     env_name: Literal["Pendulum-v1", "InvertedPendulum-v5", "Ant-v5", "Humanoid-v5"]
     agent_name: Literal["random", "ppo"]
+    seed: Optional[int] = None
     total_timesteps: int = 1_000_000  # Define total steps for training completion
     num_steps: int = (
         2048  # Steps per environment per rollout (renamed from buffer_capacity in PPOHyperparams)
@@ -75,6 +76,7 @@ CONFIGS = [
         record_episode_spacing=500,
         total_timesteps=500_000,
         max_episode_steps=200,
+        seed=42,
         ppo_hyperparams=PPOHyperparams(
             actor_lr=3e-4,
             critic_lr=1e-3,
@@ -88,6 +90,7 @@ CONFIGS = [
         record_episode_spacing=500,
         total_timesteps=200_000,
         max_episode_steps=200,
+        seed=42,
         ppo_hyperparams=PPOHyperparams(
             actor_lr=3e-4,
             critic_lr=1e-3,
@@ -101,6 +104,7 @@ CONFIGS = [
         record_episode_spacing=500,
         total_timesteps=800_000,
         max_episode_steps=400,
+        seed=42,
         ppo_hyperparams=PPOHyperparams(
             actor_lr=3e-4,
             critic_lr=1e-3,
@@ -114,6 +118,7 @@ CONFIGS = [
         record_episode_spacing=500,
         total_timesteps=1_000_000,
         max_episode_steps=400,
+        seed=42,
         ppo_hyperparams=PPOHyperparams(
             actor_lr=3e-4,
             critic_lr=1e-3,

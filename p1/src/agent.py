@@ -279,7 +279,9 @@ class PPOAgent(Agent):
         terminateds_tensor = einops.rearrange(
             torch.FloatTensor(terminateds), "step -> step 1"
         )
-        log_probs_old_tensor = torch.stack(log_probs_old).detach().view(-1)
+        log_probs_old_tensor = einops.rearrange(
+            torch.stack(log_probs_old).detach(), "step 1 -> step"
+        )
 
         # GAE Calculation
         with torch.no_grad():
@@ -299,7 +301,7 @@ class PPOAgent(Agent):
                 )
             returns_tensor = advantages + values_old
 
-        # --- PPO Update Loop with Mini-batches ---
+        # PPO Update Loop with Mini-batches
         batch_indices = np.arange(self.buffer_capacity)
         for epoch in range(hp.update_epochs):
             np.random.shuffle(batch_indices)
@@ -315,19 +317,18 @@ class PPOAgent(Agent):
                 mb_returns = returns_tensor[mb_indices]
                 mb_values_old = values_old[mb_indices]
 
-                # --- Normalize Advantages (Per Mini-batch) ---
+                # Normalize Advantages (Per Mini-batch)
                 mb_advantages_normalized = (mb_advantages - mb_advantages.mean()) / (
                     mb_advantages.std() + 1e-8
                 )
 
-                # --- Recalculate log probabilities (using UNCLIPPED actions) ---
+                # Recalculate log probabilities (using UNCLIPPED actions)
                 dist = self.get_distribution(mb_states)
                 # Calculate log_prob of the *unclipped* actions stored in the buffer
                 log_probs_new = dist.log_prob(mb_actions).sum(dim=-1)
                 entropy = dist.entropy().mean()
-                values_new = self.critic(mb_states).view(-1)
 
-                # --- Actor Loss (Clipped Surrogate Objective + Entropy Bonus) ---
+                # Actor Loss (Clipped Surrogate Objective + Entropy Bonus)
                 logratio = log_probs_new - mb_log_probs_old
                 ratio = torch.exp(logratio)
                 surr1 = ratio * mb_advantages_normalized
@@ -337,15 +338,7 @@ class PPOAgent(Agent):
                 )
                 actor_loss = -torch.min(surr1, surr2).mean() - hp.entropy_coef * entropy
 
-                # --- Value Function Loss (Clipped) ---
-                v_loss_unclipped = F.mse_loss(values_new, mb_returns, reduction="none")
-                v_clipped = mb_values_old + torch.clamp(
-                    values_new - mb_values_old, -hp.clip_epsilon, hp.clip_epsilon
-                )
-                v_loss_clipped = F.mse_loss(v_clipped, mb_returns, reduction="none")
-                critic_loss = 0.5 * torch.max(v_loss_unclipped, v_loss_clipped).mean()
-
-                # --- Actor Update with Grad Clipping ---
+                # Actor Update with Grad Clipping
                 self.actor_optimizer.zero_grad()
                 actor_loss.backward()
                 nn.utils.clip_grad_norm_(
@@ -354,7 +347,16 @@ class PPOAgent(Agent):
                 )
                 self.actor_optimizer.step()
 
-                # --- Critic Update with Grad Clipping ---
+                # Value Function Loss (Clipped)
+                values_new = self.critic(mb_states).view(-1)
+                v_loss_unclipped = F.mse_loss(values_new, mb_returns, reduction="none")
+                v_clipped = mb_values_old + torch.clamp(
+                    values_new - mb_values_old, -hp.clip_epsilon, hp.clip_epsilon
+                )
+                v_loss_clipped = F.mse_loss(v_clipped, mb_returns, reduction="none")
+                critic_loss = 0.5 * torch.max(v_loss_unclipped, v_loss_clipped).mean()
+
+                # Critic Update with Grad Clipping
                 self.critic_optimizer.zero_grad()
                 (critic_loss * hp.vf_coef).backward()
                 nn.utils.clip_grad_norm_(self.critic.parameters(), hp.max_grad_norm)
@@ -377,14 +379,8 @@ class PPOAgent(Agent):
 
 def get_agent(run_config: RunConfig, env: gym.Env):
     if run_config.agent_name == "random":
-        try:
-            return RandomAgent(env)
-        except TypeError:
-            print("Warning: RandomAgent potentially missing implementations.")
-            raise
+        return RandomAgent(env)
     elif run_config.agent_name == "ppo":
-        if not isinstance(env.action_space, gym.spaces.Box):
-            raise ValueError(f"Agent 'ppo' requires Box space")
         return PPOAgent(run_config=run_config, env=env)
     else:
         raise ValueError(f"Agent {run_config.agent_name} not found")

@@ -1,3 +1,4 @@
+import itertools
 from dataclasses import dataclass
 from typing import Literal, Optional
 
@@ -67,61 +68,115 @@ class RunConfig:
             )
 
 
-CONFIGS = [
+id_start = 0
+PENDULUM_CONFIGS = [
     RunConfig(
-        id=2,
-        name="Pendulum-v1-ppo balanced lr",
+        id=id_start + i,
+        name=f"Pendulum-v1-ppo actor_lr: {actor_lr} critic_lr: {critic_lr} seed: {seed}",
         env_name="Pendulum-v1",
         agent_name="ppo",
         record_episode_spacing=500,
-        total_timesteps=500_000,
+        total_timesteps=200_000,
         max_episode_steps=200,
-        seed=42,
+        seed=seed,
         ppo_hyperparams=PPOHyperparams(
-            actor_lr=3e-4,
-            critic_lr=1e-3,
+            actor_lr=actor_lr,
+            critic_lr=critic_lr,
         ),
-    ),
+    )
+    for i, (actor_lr, critic_lr, seed) in enumerate(
+        itertools.product(
+            [1e-3, 3e-4, 1e-4],
+            [3e-3, 1e-3, 3e-4],
+            [42, 43, 44],
+        )
+    )
+]
+
+id_start += len(PENDULUM_CONFIGS)
+
+INVERTED_PENDULUM_CONFIGS = [
     RunConfig(
-        id=3,
-        name="InvertedPendulum-v5-ppo",
+        id=id_start + i,
+        name=f"InvertedPendulum-v5-ppo actor_lr: {actor_lr} critic_lr: {critic_lr} seed: {seed}",
         env_name="InvertedPendulum-v5",
         agent_name="ppo",
         record_episode_spacing=500,
         total_timesteps=200_000,
         max_episode_steps=200,
-        seed=42,
+        seed=seed,
         ppo_hyperparams=PPOHyperparams(
-            actor_lr=3e-4,
-            critic_lr=1e-3,
+            actor_lr=actor_lr,
+            critic_lr=critic_lr,
         ),
-    ),
+    )
+    for i, (actor_lr, critic_lr, seed) in enumerate(
+        itertools.product(
+            [1e-3, 3e-4, 1e-4],
+            [3e-3, 1e-3, 3e-4],
+            [42, 43, 44],
+        )
+    )
+]
+
+id_start += len(INVERTED_PENDULUM_CONFIGS)
+
+ANT_CONFIGS = [
     RunConfig(
-        id=4,
-        name="Ant-v5-ppo",
+        id=id_start + i,
+        name=f"Ant-v5-ppo actor_lr: {actor_lr} critic_lr: {critic_lr} seed: {seed}",
         env_name="Ant-v5",
         agent_name="ppo",
         record_episode_spacing=500,
         total_timesteps=800_000,
         max_episode_steps=400,
-        seed=42,
+        seed=seed,
         ppo_hyperparams=PPOHyperparams(
-            actor_lr=3e-4,
-            critic_lr=1e-3,
+            actor_lr=actor_lr,
+            critic_lr=critic_lr,
         ),
-    ),
+    )
+    for i, (actor_lr, critic_lr, seed) in enumerate(
+        itertools.product(
+            [1e-3, 3e-4, 1e-4],
+            [3e-3, 1e-3, 3e-4],
+            [42, 43, 44],
+        )
+    )
+]
+
+id_start += len(ANT_CONFIGS)
+
+HUMANOID_CONFIGS = [
     RunConfig(
-        id=5,
-        name="Humanoid-v5-ppo",
+        id=id_start + i,
+        name=f"Humanoid-v5-ppo actor_lr: {actor_lr} critic_lr: {critic_lr} seed: {seed}",
         env_name="Humanoid-v5",
         agent_name="ppo",
         record_episode_spacing=500,
         total_timesteps=1_000_000,
         max_episode_steps=400,
-        seed=42,
+        seed=seed,
         ppo_hyperparams=PPOHyperparams(
-            actor_lr=3e-4,
-            critic_lr=1e-3,
+            actor_lr=actor_lr,
+            critic_lr=critic_lr,
         ),
-    ),
+    )
+    for i, (actor_lr, critic_lr, seed) in enumerate(
+        itertools.product(
+            [1e-3, 3e-4, 1e-4],
+            [3e-3, 1e-3, 3e-4],
+            [42, 43, 44],
+        )
+    )
 ]
+
+CONFIGS = PENDULUM_CONFIGS + INVERTED_PENDULUM_CONFIGS + ANT_CONFIGS + HUMANOID_CONFIGS
+
+if __name__ == "__main__":
+    print(f"PENDULUM_CONFIGS: {len(PENDULUM_CONFIGS)}")
+    print(f"INVERTED_PENDULUM_CONFIGS: {len(INVERTED_PENDULUM_CONFIGS)}")
+    print(f"ANT_CONFIGS: {len(ANT_CONFIGS)}")
+    print(f"HUMANOID_CONFIGS: {len(HUMANOID_CONFIGS)}")
+    print()
+    print(f"Total CONFIGS: {len(CONFIGS)}")

@@ -73,9 +73,6 @@ def get_env(run_config: RunConfig):
     env = gym.make(run_config.env_name, render_mode="rgb_array")
 
     if run_config.max_episode_steps is not None:
-        print(
-            f"Applying TimeLimit wrapper with max_episode_steps={run_config.max_episode_steps}"
-        )
         env = gym.wrappers.TimeLimit(
             env, max_episode_steps=run_config.max_episode_steps
         )
@@ -110,7 +107,6 @@ def run_experiment(run_config: RunConfig):
     start_time = time.time()
 
     if run_config.seed is not None:
-        print(f"Setting seed: {run_config.seed}")
         random.seed(run_config.seed)
         np.random.seed(run_config.seed)
         torch.manual_seed(run_config.seed)
@@ -124,10 +120,6 @@ def run_experiment(run_config: RunConfig):
         hp = run_config.ppo_hyperparams
         if hp is None:
             raise ValueError("PPOAgent needs hyperparameters")
-        mb_size = getattr(agent, "minibatch_size", "N/A")
-        print(
-            f"  Agent: PPO, Rollout Length: {run_config.num_steps}, Mini-batch Size: {mb_size}, Update Epochs: {hp.update_epochs}"
-        )
     else:
         print(f"  Agent: {run_config.agent_name} (Not training)")
 

@@ -62,33 +62,35 @@ for run_config in PENDULUM_CONFIGS:
         continue
 # %%
 
-sum_of_rewards = np.array([df["rewards"].sum() for df in hist_dfs.values()])
-sum_of_final_rewards = np.array(
-    [df["rewards"].iloc[-WINDOW_SIZE:].sum() for df in hist_dfs.values()]
+mean_of_rewards = np.array([df["rewards"].mean() for df in hist_dfs.values()])
+mean_of_final_rewards = np.array(
+    [df["rewards"].iloc[-WINDOW_SIZE:].mean() for df in hist_dfs.values()]
 )
 # TODO: remove this truncation once all data is collected
-sum_of_final_rewards = sum_of_final_rewards[: (len(sum_of_final_rewards) // 5) * 5]
-sum_of_final_rewards = rearrange(
-    sum_of_final_rewards, "(config seed) -> config seed", seed=5
+mean_of_final_rewards = mean_of_final_rewards[: (len(mean_of_final_rewards) // 5) * 5]
+mean_of_final_rewards = rearrange(
+    mean_of_final_rewards, "(config seed) -> config seed", seed=5
 )
 # %%
 alpha = 0.05
 pval_grid = np.ones((len(PENDULUM_CONFIGS) // 5, len(PENDULUM_CONFIGS) // 5))
 diff_of_means_grid = np.zeros((len(PENDULUM_CONFIGS) // 5, len(PENDULUM_CONFIGS) // 5))
 significant_grid = np.zeros((len(PENDULUM_CONFIGS) // 5, len(PENDULUM_CONFIGS) // 5))
-for i in range(len(sum_of_final_rewards)):
-    for j in range(len(sum_of_final_rewards)):
+for i in range(len(mean_of_final_rewards)):
+    for j in range(len(mean_of_final_rewards)):
         if i == j:
             pval_grid[i, j] = 1
         else:
-            ttest, pval = stats.ttest_rel(
-                sum_of_final_rewards[i], sum_of_final_rewards[j]
+            ttest, pval = stats.ttest_ind(
+                mean_of_final_rewards[i], mean_of_final_rewards[j]
             )
+            if not isinstance(pval, np.float64):
+                raise ValueError(f"pval is not a float: {pval}")
             pval_grid[i, j] = pval
             if pval < alpha:
                 significant_grid[i, j] = 1
-            diff_of_means = np.mean(sum_of_final_rewards[i]) - np.mean(
-                sum_of_final_rewards[j]
+            diff_of_means = np.mean(mean_of_final_rewards[i]) - np.mean(
+                mean_of_final_rewards[j]
             )
             diff_of_means_grid[i, j] = diff_of_means
 fig, ax = plt.subplots(figsize=(7, 6))

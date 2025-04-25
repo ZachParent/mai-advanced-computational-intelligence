@@ -105,7 +105,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--remote_host",
         help="SSH host alias defined in your ~/.ssh/config file.",
-        default="alogin1.bsc.es",
+        default="atci-sweden",
     )
     parser.add_argument(
         "--local_dir",
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--remote_dir",
         help="Path to the remote directory.",
-        default="atci",
+        default="/workspace/atci",
     )
 
     # Add argument for excludes
@@ -135,9 +135,7 @@ if __name__ == "__main__":
     # Add the specific exclude pattern you requested if not already passed via CLI
     exclude_list = args.exclude
     if "*venv/" not in exclude_list:  # Add your default exclude if not specified
-        exclude_list.extend(
-            ["*venv/", "*.pyc", "*.pyo", ".vscode/", ".DS_Store", ".git/"]
-        )
+        exclude_list.extend(["*venv/", "*.pyc", "*.pyo", ".vscode/", ".DS_Store"])
 
     sync_directory_rsync(
         args.remote_host, local_path, args.remote_dir, args.direction, exclude_list

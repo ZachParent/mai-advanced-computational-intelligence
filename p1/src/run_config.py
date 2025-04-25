@@ -88,7 +88,7 @@ PENDULUM_CONFIGS = [
         itertools.product(
             [1e-3, 3e-4, 1e-4],
             [3e-3, 1e-3, 3e-4],
-            [42, 43, 44],
+            [42, 43, 44, 45, 46],
         )
     )
 ]
@@ -114,7 +114,7 @@ INVERTED_PENDULUM_CONFIGS = [
         itertools.product(
             [1e-3, 3e-4, 1e-4],
             [3e-3, 1e-3, 3e-4],
-            [42, 43, 44],
+            [42, 43, 44, 45, 46],
         )
     )
 ]
@@ -140,7 +140,7 @@ ANT_CONFIGS = [
         itertools.product(
             [1e-3, 3e-4, 1e-4],
             [3e-3, 1e-3, 3e-4],
-            [42, 43, 44],
+            [42, 43, 44, 45, 46],
         )
     )
 ]
@@ -166,17 +166,19 @@ HUMANOID_CONFIGS = [
         itertools.product(
             [1e-3, 3e-4, 1e-4],
             [3e-3, 1e-3, 3e-4],
-            [42, 43, 44],
+            [42, 43, 44, 45, 46],
         )
     )
 ]
 
-CONFIGS = PENDULUM_CONFIGS + INVERTED_PENDULUM_CONFIGS + ANT_CONFIGS + HUMANOID_CONFIGS
+CONFIGS = (
+    PENDULUM_CONFIGS + INVERTED_PENDULUM_CONFIGS + ANT_CONFIGS
+)  # + HUMANOID_CONFIGS
 
 if __name__ == "__main__":
     print(f"PENDULUM_CONFIGS: {len(PENDULUM_CONFIGS)}")
     print(f"INVERTED_PENDULUM_CONFIGS: {len(INVERTED_PENDULUM_CONFIGS)}")
     print(f"ANT_CONFIGS: {len(ANT_CONFIGS)}")
-    print(f"HUMANOID_CONFIGS: {len(HUMANOID_CONFIGS)}")
+    # print(f"HUMANOID_CONFIGS: {len(HUMANOID_CONFIGS)}")
     print()
     print(f"Total CONFIGS: {len(CONFIGS)}")

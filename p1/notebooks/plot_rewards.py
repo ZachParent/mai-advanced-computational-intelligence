@@ -8,6 +8,7 @@ import pandas as pd
 import scipy.stats as stats
 import seaborn as sns
 from einops import rearrange
+from matplotlib.patches import Rectangle
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.append(str(PROJECT_ROOT))
@@ -71,7 +72,10 @@ sum_of_final_rewards = rearrange(
     sum_of_final_rewards, "(config seed) -> config seed", seed=5
 )
 # %%
+alpha = 0.05
 pval_grid = np.ones((len(PENDULUM_CONFIGS) // 5, len(PENDULUM_CONFIGS) // 5))
+diff_of_means_grid = np.zeros((len(PENDULUM_CONFIGS) // 5, len(PENDULUM_CONFIGS) // 5))
+significant_grid = np.zeros((len(PENDULUM_CONFIGS) // 5, len(PENDULUM_CONFIGS) // 5))
 for i in range(len(sum_of_final_rewards)):
     for j in range(len(sum_of_final_rewards)):
         if i == j:
@@ -81,11 +85,58 @@ for i in range(len(sum_of_final_rewards)):
                 sum_of_final_rewards[i], sum_of_final_rewards[j]
             )
             pval_grid[i, j] = pval
-fig, ax = plt.subplots(figsize=(12, 10))
-sns.heatmap(pval_grid, annot=True, cmap="PuBuGn_r", vmin=0, vmax=1, ax=ax)
+            if pval < alpha:
+                significant_grid[i, j] = 1
+            diff_of_means = np.mean(sum_of_final_rewards[i]) - np.mean(
+                sum_of_final_rewards[j]
+            )
+            diff_of_means_grid[i, j] = diff_of_means
+fig, ax = plt.subplots(figsize=(7, 6))
+sns.heatmap(
+    pval_grid,
+    annot=True,
+    cmap="PuBuGn_r",
+    vmin=0,
+    vmax=1,
+    ax=ax,
+    linewidths=0.5,
+    linecolor="lightgrey",
+)
+for (i, j), val in np.ndenumerate(significant_grid):
+    if val == 1:
+        rect = Rectangle(
+            (j + 0.02, i + 0.02),
+            0.96,
+            0.96,
+            fill=False,
+            edgecolor="mediumseagreen",
+            linewidth=2,
+        )
+        ax.add_patch(rect)
 ax.set_title(f"P-values of Rewards from Final {WINDOW_SIZE} Episodes")
 ax.set_xlabel("Experiment")
 ax.set_ylabel("Experiment")
+plt.tight_layout()
+plt.show()
+
+fig, ax = plt.subplots(figsize=(7, 6))
+sns.heatmap(diff_of_means_grid, annot=True, cmap="bwr", ax=ax, center=0)
+for (i, j), val in np.ndenumerate(significant_grid):
+    if val == 1:
+        rect = Rectangle(
+            (j + 0.02, i + 0.02),
+            0.96,
+            0.96,
+            fill=False,
+            edgecolor="mediumseagreen",
+            linewidth=2,
+        )
+        ax.add_patch(rect)
+ax.set_title(
+    f"Advantage of Exp A over Exp B's Rewards from Final {WINDOW_SIZE} Episodes"
+)
+ax.set_xlabel("Experiment B")
+ax.set_ylabel("Experiment A")
 plt.tight_layout()
 plt.show()
 # %%

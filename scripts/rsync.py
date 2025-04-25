@@ -135,7 +135,9 @@ if __name__ == "__main__":
     # Add the specific exclude pattern you requested if not already passed via CLI
     exclude_list = args.exclude
     if "*venv/" not in exclude_list:  # Add your default exclude if not specified
-        exclude_list.extend(["*venv/", "*.pyc", "*.pyo", ".vscode/", ".DS_Store"])
+        exclude_list.extend(
+            ["*venv/", "*.pyc", "*.pyo", ".vscode/", ".DS_Store", ".git/"]
+        )
 
     sync_directory_rsync(
         args.remote_host, local_path, args.remote_dir, args.direction, exclude_list

@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from agent import Agent
+from config import DEVICE
 from run_config import PPOHyperparams, RunConfig
 from torch.distributions import Normal
 
@@ -90,18 +91,22 @@ class PPOAgent(Agent):
 
         if not isinstance(env.action_space, gym.spaces.Box):
             raise ValueError("PPOAgent only supports Box spaces.")
-        self.action_low = torch.tensor(env.action_space.low, dtype=torch.float32)
-        self.action_high = torch.tensor(env.action_space.high, dtype=torch.float32)
+        self.action_low = torch.tensor(
+            env.action_space.low, dtype=torch.float32, device=DEVICE
+        )
+        self.action_high = torch.tensor(
+            env.action_space.high, dtype=torch.float32, device=DEVICE
+        )
 
         assert env.observation_space.shape is not None, "Obs shape cannot be None"
         state_dim = env.observation_space.shape[0]
         action_dim = env.action_space.shape[0]
 
-        self.actor_mean = ActorMean(state_dim, action_dim)
+        self.actor_mean = ActorMean(state_dim, action_dim).to(DEVICE)
         self.actor_log_std = nn.Parameter(
-            torch.zeros(1, action_dim)
+            torch.zeros(1, action_dim, device=DEVICE)
         )  # Initialize log_std to 0
-        self.critic = Critic(state_dim)
+        self.critic = Critic(state_dim).to(DEVICE)
 
         self.actor_optimizer = optim.Adam(
             list(self.actor_mean.parameters()) + [self.actor_log_std],
@@ -122,7 +127,7 @@ class PPOAgent(Agent):
 
     def get_distribution(self, state: torch.Tensor) -> Normal:
         # Actor outputs mean in range [-1, 1]
-        action_mean_normalized = self.actor_mean(state)
+        action_mean_normalized = self.actor_mean(state.to(DEVICE))
         # Scale mean to environment's action space range
         action_mean = action_mean_normalized * self.action_scale + self.action_bias
         std = torch.exp(self.actor_log_std)
@@ -142,7 +147,7 @@ class PPOAgent(Agent):
             action_unclipped, self.action_low, self.action_high
         )
         # Return the UNCLIPPED tensor, the CLIPPED numpy array, and the log_prob (of unclipped)
-        return action_unclipped, action_clipped.numpy(), log_prob
+        return action_unclipped, action_clipped.cpu().numpy(), log_prob
 
     def store_transition(
         self,
@@ -185,21 +190,23 @@ class PPOAgent(Agent):
 
         states_tensor = einops.rearrange(
             torch.FloatTensor(np.array(states)), "step dim -> step dim"
-        )
+        ).to(DEVICE)
         # Stack the UNCLIPPED action tensors stored in the buffer
         actions_tensor = einops.rearrange(
             torch.stack(actions_unclipped), "step action -> step action"
-        )
-        rewards_tensor = einops.rearrange(torch.FloatTensor(rewards), "step -> step 1")
+        ).to(DEVICE)
+        rewards_tensor = einops.rearrange(
+            torch.FloatTensor(rewards), "step -> step 1"
+        ).to(DEVICE)
         next_states_tensor = einops.rearrange(
             torch.FloatTensor(np.array(next_states)), "step dim -> step dim"
-        )
+        ).to(DEVICE)
         terminateds_tensor = einops.rearrange(
             torch.FloatTensor(terminateds), "step -> step 1"
-        )
+        ).to(DEVICE)
         log_probs_old_tensor = einops.rearrange(
             torch.stack(log_probs_old).detach(), "step 1 -> step"
-        )
+        ).to(DEVICE)
 
         # GAE Calculation
         with torch.no_grad():

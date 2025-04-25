@@ -1,9 +1,10 @@
 ale-py
 einops
-gymnasium[classic_control,mujoco]
+gymnasium[classic_control,mujoco,other]
 matplotlib
 numpy
 pandas
+pygame
 stable-baselines3
 torch
 tqdm

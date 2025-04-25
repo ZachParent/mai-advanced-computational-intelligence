@@ -5,6 +5,7 @@ matplotlib
 numpy
 pandas
 pygame
+scipy
 stable-baselines3
 torch
 tqdm

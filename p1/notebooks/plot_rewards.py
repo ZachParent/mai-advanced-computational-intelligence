@@ -13,7 +13,7 @@ from src.config import RESULTS_DIR
 # %%
 experiment_id = 4
 
-results = pd.read_csv(RESULTS_DIR / f"{experiment_id:02d}.csv")
+results = pd.read_csv(RESULTS_DIR / f"{experiment_id:03d}.csv")
 results.columns = ["episode", "reward", "length"]
 
 window_size = 10  # You can adjust the window size for the moving average

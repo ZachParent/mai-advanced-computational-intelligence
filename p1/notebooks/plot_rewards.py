@@ -14,17 +14,18 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
 from src.config import RESULTS_DIR
-from src.run_config import PENDULUM_CONFIGS
+from src.run_config import INVERTED_PENDULUM_CONFIGS
 
 plt.style.use("default")
 WINDOW_SIZE = 20
+configs = INVERTED_PENDULUM_CONFIGS
 
 # %%
 # plot reward over episodes
 n_rows = 5
-n_cols = len(PENDULUM_CONFIGS) // n_rows
+n_cols = len(configs) // n_rows
 fig, axs = plt.subplots(n_rows, n_cols, figsize=(3 * n_cols, 3 * n_rows))
-for i, run_config in enumerate(PENDULUM_CONFIGS):
+for i, run_config in enumerate(configs):
     experiment_id = run_config.id
     try:
         results = pd.read_csv(RESULTS_DIR / f"{experiment_id:03d}.csv")
@@ -53,7 +54,7 @@ plt.tight_layout()
 plt.show()
 # %%
 hist_dfs = {}
-for run_config in PENDULUM_CONFIGS:
+for run_config in configs:
     experiment_id = run_config.id
     try:
         hist_dfs[experiment_id] = pd.read_csv(RESULTS_DIR / f"{experiment_id:03d}.csv")
@@ -73,9 +74,9 @@ mean_of_final_rewards = rearrange(
 )
 # %%
 alpha = 0.05
-pval_grid = np.ones((len(PENDULUM_CONFIGS) // 5, len(PENDULUM_CONFIGS) // 5))
-diff_of_means_grid = np.zeros((len(PENDULUM_CONFIGS) // 5, len(PENDULUM_CONFIGS) // 5))
-significant_grid = np.zeros((len(PENDULUM_CONFIGS) // 5, len(PENDULUM_CONFIGS) // 5))
+pval_grid = np.ones((len(configs) // 5, len(configs) // 5))
+diff_of_means_grid = np.zeros((len(configs) // 5, len(configs) // 5))
+significant_grid = np.zeros((len(configs) // 5, len(configs) // 5))
 for i in range(len(mean_of_final_rewards)):
     for j in range(len(mean_of_final_rewards)):
         if i == j:

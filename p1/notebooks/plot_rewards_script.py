@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -198,9 +199,9 @@ def plot_individual_rewards(
         moving_average = results["rewards"].rolling(window=window_size).mean()
 
         ax.plot(
-            results["rewards"], alpha=0.4, label="Original Rewards", color="dodgerblue"
+            results["rewards"], label="Original Rewards", color=mpl.colormaps["Pastel1"].colors[1]  # type: ignore
         )
-        ax.plot(moving_average, label=f"MA ({window_size})", color="blueviolet")
+        ax.plot(moving_average, label=f"MA ({window_size})", color=mpl.colormaps["Paired"].colors[9])  # type: ignore
         ax.set_xlabel("Episode")
         ax.set_ylabel("Reward")
         ax.set_title(f"Experiment {experiment_id}")

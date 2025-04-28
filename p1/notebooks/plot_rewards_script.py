@@ -16,7 +16,12 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
 from src.config import DATA_DIR, FIGURES_DIR, RESULTS_DIR
-from src.run_config import ANT_CONFIGS, RunConfig  # Assuming RunConfig is defined here
+from src.run_config import (  # Assuming RunConfig is defined here
+    ANT_CONFIGS,
+    INVERTED_PENDULUM_CONFIGS,
+    PENDULUM_CONFIGS,
+    RunConfig,
+)
 
 # Default plotting style and constants
 plt.style.use("default")
@@ -202,6 +207,7 @@ def plot_individual_rewards(
             results["rewards"], label="Original Rewards", color=mpl.colormaps["Pastel1"].colors[1]  # type: ignore
         )
         ax.plot(moving_average, label=f"MA ({window_size})", color=mpl.colormaps["Paired"].colors[9])  # type: ignore
+        ax.set_ylim(bottom=-15, top=10)
         ax.set_xlabel("Episode")
         ax.set_ylabel("Reward")
         ax.set_title(f"Experiment {experiment_id}")
@@ -640,6 +646,8 @@ def main(
 if __name__ == "__main__":
     # Example usage: Analyze the ANT_CONFIGS
     # You can easily swap ANT_CONFIGS with another list of RunConfig objects
+    main(configs_to_analyze=PENDULUM_CONFIGS, env_name="pendulum")
+    main(configs_to_analyze=INVERTED_PENDULUM_CONFIGS, env_name="inverted_pendulum")
     main(configs_to_analyze=ANT_CONFIGS, env_name="ant")
 
     # Example: Analyze only the first 10 configs with a different window size

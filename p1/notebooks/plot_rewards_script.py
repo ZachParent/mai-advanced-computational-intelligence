@@ -11,10 +11,10 @@ import seaborn as sns
 from einops import rearrange
 from matplotlib.patches import Rectangle
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
-from src.config import DATA_DIR, RESULTS_DIR
+from src.config import DATA_DIR, FIGURES_DIR, RESULTS_DIR
 from src.run_config import ANT_CONFIGS, RunConfig  # Assuming RunConfig is defined here
 
 # Default plotting style and constants
@@ -162,8 +162,7 @@ def plot_individual_rewards(
 ):
     """Plots reward curves and moving averages for each experiment."""
     if not hist_dfs:
-        print("No history data to plot.")
-        return
+        raise ValueError("No history data to plot.")
 
     n_cols = (len(configs) + n_rows - 1) // n_rows  # Calculate columns needed
     fig, axs = plt.subplots(
@@ -226,6 +225,7 @@ def plot_individual_rewards(
 
     plt.tight_layout()
     plt.show()
+    return fig
 
 
 def plot_pairwise_comparison(
@@ -334,6 +334,7 @@ def plot_pairwise_comparison(
     ax_diff.set_ylabel("Config Group Index (Row)")
     plt.tight_layout()
     plt.show()
+    return fig_pval, fig_diff
 
 
 def plot_independent_variable_analysis(
@@ -341,15 +342,11 @@ def plot_independent_variable_analysis(
 ):
     """Performs t-tests and plots results based on an independent variable."""
     if analysis_df.empty or "final_reward" not in analysis_df.columns:
-        print(
-            f"Analysis dataframe is empty or missing 'final_reward'. Cannot plot independent variable '{independent_var}'."
-        )
-        return
+        raise ValueError("Analysis dataframe is empty or missing 'final_reward'.")
     if independent_var not in analysis_df.columns:
-        print(
+        raise ValueError(
             f"Independent variable '{independent_var}' not found in dataframe columns: {analysis_df.columns}"
         )
-        return
 
     independent_vals = sorted(analysis_df[independent_var].unique())
     independent_vals_str = [str(val) for val in independent_vals]
@@ -501,6 +498,7 @@ def plot_independent_variable_analysis(
     ax_diff.set_ylabel(f"{independent_var} (Row)")
     plt.tight_layout()
     plt.show()
+    return fig_pval, fig_diff
 
 
 def plot_learning_rate_comparison(analysis_df: pd.DataFrame, window_size: int):
@@ -508,13 +506,11 @@ def plot_learning_rate_comparison(analysis_df: pd.DataFrame, window_size: int):
     if analysis_df.empty or not all(
         c in analysis_df.columns for c in ["actor_lr", "critic_lr", "final_reward"]
     ):
-        print(
+        raise ValueError(
             "Analysis dataframe is missing required columns (actor_lr, critic_lr, final_reward) for boxenplot."
         )
-        return
     if analysis_df["final_reward"].isnull().all():
-        print("No valid final_reward data to plot in boxenplot.")
-        return
+        raise ValueError("No valid final_reward data to plot in boxenplot.")
 
     fig, ax = plt.subplots(
         figsize=(max(8, analysis_df["actor_lr"].nunique() * 1.5), 6)
@@ -538,11 +534,13 @@ def plot_learning_rate_comparison(analysis_df: pd.DataFrame, window_size: int):
     ax.legend(title="Critic Learning Rate", bbox_to_anchor=(1.05, 1), loc="upper left")
     plt.tight_layout()
     plt.show()
+    return fig
 
 
 # %% Main execution block
 def main(
     configs_to_analyze: List[RunConfig],
+    env_name: str,
     window_size: int = DEFAULT_WINDOW_SIZE,
     alpha: float = DEFAULT_ALPHA,
     seeds_per_config: int = SEEDS_PER_CONFIG,
@@ -552,6 +550,7 @@ def main(
     plot_pairwise: bool = True,
     plot_independent: bool = True,
     plot_boxen: bool = True,
+    save_plots: bool = True,
 ):
     """Runs the analysis workflow."""
     print(f"Analyzing {len(configs_to_analyze)} configurations...")
@@ -574,7 +573,11 @@ def main(
     if plot_individuals:
         print("\n--- Plotting Individual Rewards ---")
         try:
-            plot_individual_rewards(hist_dfs, window_size, configs=configs_to_analyze)
+            fig = plot_individual_rewards(
+                hist_dfs, window_size, configs=configs_to_analyze
+            )
+            if save_plots:
+                fig.savefig(FIGURES_DIR / f"individual_rewards_curves_{env_name}.png")
         except Exception as e:
             print(f"Error plotting individual rewards: {e}")
 
@@ -584,7 +587,16 @@ def main(
             final_rewards_by_seed = calculate_final_rewards_by_seed(
                 configs_to_analyze, hist_dfs, window_size, seeds_per_config
             )
-            plot_pairwise_comparison(final_rewards_by_seed, window_size, alpha)
+            fig_pval, fig_diff = plot_pairwise_comparison(
+                final_rewards_by_seed, window_size, alpha
+            )
+            if save_plots:
+                fig_pval.savefig(
+                    FIGURES_DIR / f"pairwise_comparison_pval_{env_name}.png"
+                )
+                fig_diff.savefig(
+                    FIGURES_DIR / f"pairwise_comparison_diff_{env_name}.png"
+                )
         except ValueError as e:
             print(f"Error in pairwise comparison (likely data shape issue): {e}")
         except Exception as e:
@@ -606,19 +618,26 @@ def main(
     if plot_independent:
         print(f"\n--- Plotting Independent Variable Analysis ---")
         try:
-            plot_independent_variable_analysis(
+            fig_actor_pval, fig_actor_diff = plot_independent_variable_analysis(
                 analysis_df, "actor_lr", window_size, alpha
             )
-            plot_independent_variable_analysis(
+            fig_critic_pval, fig_critic_diff = plot_independent_variable_analysis(
                 analysis_df, "critic_lr", window_size, alpha
             )
+            if save_plots:
+                fig_actor_pval.savefig(FIGURES_DIR / f"actor_lr_pval_{env_name}.png")
+                fig_actor_diff.savefig(FIGURES_DIR / f"actor_lr_diff_{env_name}.png")
+                fig_critic_pval.savefig(FIGURES_DIR / f"critic_lr_pval_{env_name}.png")
+                fig_critic_diff.savefig(FIGURES_DIR / f"critic_lr_diff_{env_name}.png")
         except Exception as e:
             print(f"Error plotting independent variable analysis: {e}")
 
     if plot_boxen:
         print("\n--- Plotting Learning Rate Comparison (Boxenplot) ---")
         try:
-            plot_learning_rate_comparison(analysis_df, window_size)
+            fig = plot_learning_rate_comparison(analysis_df, window_size)
+            if save_plots:
+                fig.savefig(FIGURES_DIR / f"learning_rate_comparison_{env_name}.png")
         except Exception as e:
             print(f"Error plotting learning rate comparison: {e}")
 
@@ -626,7 +645,7 @@ def main(
 if __name__ == "__main__":
     # Example usage: Analyze the ANT_CONFIGS
     # You can easily swap ANT_CONFIGS with another list of RunConfig objects
-    main(configs_to_analyze=ANT_CONFIGS)
+    main(configs_to_analyze=ANT_CONFIGS, env_name="ant")
 
     # Example: Analyze only the first 10 configs with a different window size
     # print("\n\n--- Analyzing first 10 configs with window size 10 ---")

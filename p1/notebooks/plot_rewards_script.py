@@ -286,7 +286,7 @@ def plot_pairwise_comparison(
                 0.96,
                 0.96,
                 fill=False,
-                edgecolor="mediumseagreen",
+                edgecolor="gold",
                 linewidth=2,
             )
             ax_pval.add_patch(rect)
@@ -307,7 +307,7 @@ def plot_pairwise_comparison(
         diff_of_means_grid,
         annot=True,
         fmt=".2f",
-        cmap="bwr",
+        cmap="PRGn",
         ax=ax_diff,
         center=0,
         vmin=-max_abs_diff,
@@ -323,7 +323,7 @@ def plot_pairwise_comparison(
                 0.96,
                 0.96,
                 fill=False,
-                edgecolor="darkslategrey",  # Changed color for visibility on bwr
+                edgecolor="gold",
                 linewidth=2,
             )
             ax_diff.add_patch(rect)
@@ -424,9 +424,7 @@ def plot_independent_variable_analysis(
                 diff_of_means_grid[i, j] = np.nan
 
     # Plot p-values
-    fig_pval, ax_pval = plt.subplots(
-        figsize=(max(7, n_vals * 0.8), max(6, n_vals * 0.7))
-    )
+    fig_pval, ax_pval = plt.subplots(figsize=(7, 6))
     sns.heatmap(
         pval_grid,
         annot=True,
@@ -447,8 +445,8 @@ def plot_independent_variable_analysis(
                 0.96,
                 0.96,
                 fill=False,
-                edgecolor="mediumseagreen",
-                lw=2,
+                edgecolor="gold",
+                lw=4,
             )
             ax_pval.add_patch(rect)
     ax_pval.set_title(f"P-values by {independent_var}\nFinal {window_size} Episodes")
@@ -458,9 +456,7 @@ def plot_independent_variable_analysis(
     plt.show()
 
     # Plot difference of means
-    fig_diff, ax_diff = plt.subplots(
-        figsize=(max(7, n_vals * 0.8), max(6, n_vals * 0.7))
-    )
+    fig_diff, ax_diff = plt.subplots(figsize=(7, 6))
     max_abs_diff = (
         np.nanmax(np.abs(diff_of_means_grid))
         if not np.all(np.isnan(diff_of_means_grid))
@@ -469,7 +465,7 @@ def plot_independent_variable_analysis(
     sns.heatmap(
         diff_of_means_grid,
         annot=True,
-        cmap="bwr",
+        cmap="PRGn",
         ax=ax_diff,
         center=0,
         vmin=-max_abs_diff,
@@ -487,8 +483,8 @@ def plot_independent_variable_analysis(
                 0.96,
                 0.96,
                 fill=False,
-                edgecolor="darkslategrey",
-                lw=2,
+                edgecolor="gold",
+                lw=4,
             )
             ax_diff.add_patch(rect)
     ax_diff.set_title(
@@ -512,15 +508,14 @@ def plot_learning_rate_comparison(analysis_df: pd.DataFrame, window_size: int):
     if analysis_df["final_reward"].isnull().all():
         raise ValueError("No valid final_reward data to plot in boxenplot.")
 
-    fig, ax = plt.subplots(
-        figsize=(max(8, analysis_df["actor_lr"].nunique() * 1.5), 6)
-    )  # Adjust size
+    fig, ax = plt.subplots(figsize=(7, 6))  # Adjust size
     sns.boxenplot(
         data=analysis_df.dropna(subset=["final_reward"]),  # Ensure no NaNs in reward
         x="actor_lr",
         y="final_reward",
         hue="critic_lr",
         palette="Set2",
+        line_kws={"linewidth": 2, "color": "black"},
         gap=0.1,  # Reduced gap
         k_depth="proportion",  # Alternative depth scaling
         ax=ax,
@@ -530,8 +525,7 @@ def plot_learning_rate_comparison(analysis_df: pd.DataFrame, window_size: int):
     )
     ax.set_xlabel("Actor Learning Rate")
     ax.set_ylabel("Final Reward (Avg. over last episodes)")
-    ax.tick_params(axis="x", rotation=45)  # Rotate labels if many categories
-    ax.legend(title="Critic Learning Rate", bbox_to_anchor=(1.05, 1), loc="upper left")
+    ax.legend(title="Critic Learning Rate")
     plt.tight_layout()
     plt.show()
     return fig

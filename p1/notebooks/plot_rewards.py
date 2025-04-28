@@ -14,11 +14,11 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
 from src.config import DATA_DIR, RESULTS_DIR
-from src.run_config import ANT_CONFIGS
+from src.run_config import PENDULUM_CONFIGS
 
 plt.style.use("default")
 WINDOW_SIZE = 20
-configs = ANT_CONFIGS
+configs = PENDULUM_CONFIGS
 
 # %%
 # plot reward over episodes
@@ -147,7 +147,7 @@ plt.show()
 # %%
 all_configs_df = pd.read_csv(DATA_DIR / "configs.csv")
 all_configs_df.set_index("id", inplace=True)
-configs_df = all_configs_df[all_configs_df["env_name"] == "Ant-v5"].copy()
+configs_df = all_configs_df.iloc[list(hist_dfs.keys())].copy()
 
 configs_df["final_reward"] = [
     hist_dfs[id]["rewards"][-WINDOW_SIZE:].mean() for id in configs_df.index

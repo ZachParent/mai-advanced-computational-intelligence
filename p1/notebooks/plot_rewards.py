@@ -14,11 +14,11 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
 from src.config import DATA_DIR, RESULTS_DIR
-from src.run_config import PENDULUM_CONFIGS
+from src.run_config import ANT_CONFIGS
 
 plt.style.use("default")
 WINDOW_SIZE = 20
-configs = PENDULUM_CONFIGS
+configs = ANT_CONFIGS
 
 # %%
 # plot reward over episodes
@@ -207,3 +207,23 @@ sns.heatmap(
     xticklabels=independent_vals_str,
     yticklabels=independent_vals_str,
 )
+# %%
+fig, ax = plt.subplots(figsize=(7, 6))
+sns.boxenplot(
+    data=configs_df,
+    x="actor_lr",
+    y="final_reward",
+    hue="critic_lr",
+    palette="Set2",
+    gap=0.2,
+    k_depth=4,
+    ax=ax,
+)
+ax.set_title("Final Reward by Actor and Critic Learning Rates")
+ax.set_xlabel("Actor Learning Rate")
+ax.set_ylabel("Final Reward")
+ax.legend(title="Critic Learning Rate")
+plt.tight_layout()
+plt.show()
+
+# %%

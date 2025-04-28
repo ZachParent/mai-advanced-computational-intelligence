@@ -14,11 +14,11 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.append(str(PROJECT_ROOT))
 
 from src.config import RESULTS_DIR
-from src.run_config import INVERTED_PENDULUM_CONFIGS
+from src.run_config import ANT_CONFIGS
 
 plt.style.use("default")
 WINDOW_SIZE = 20
-configs = INVERTED_PENDULUM_CONFIGS
+configs = ANT_CONFIGS
 
 # %%
 # plot reward over episodes

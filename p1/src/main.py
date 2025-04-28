@@ -21,7 +21,7 @@ class MetricsLogger:
         self.current_episode_reward = 0
         self.current_episode_length = 0
         self.progress_bar = tqdm(
-            total=run_config.total_timesteps, desc="Training Steps"
+            total=run_config.total_timesteps, desc="Training Steps", smoothing=0.01
         )
         RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 

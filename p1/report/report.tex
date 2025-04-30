@@ -140,9 +140,198 @@ The experimental setup resulted in a total of 45 runs per environment (3 actor r
     \end{subfigure}
     \captionsetup{justification=centering} \
     \caption{Rewards curves for each environment. Each row represents a different seed, each column represents a different learning rate configuration}
+    \label{fig:rewards_curves}
 \end{figure}
 
-Discuss the results and their significance. For instance, we observed that...
+The configurations for each environment were run long enough to converge. The reward curves, including the actual episode reward and the moving average reward, are shown in  \autoref{fig:rewards_curves}. The reward from the final 20 episodes of each run were averaged to and used as the measure of performance for that run. Further analysis of this performance follows.
+
+\subsection{Rejecting the Null Hypothesis}
+\begin{figure}[ht]
+    \centering
+    \begin{subfigure}{0.3\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/pairwise_comparison_pval_pendulum.png}
+        \caption{Pendulum}
+    \end{subfigure}
+    \begin{subfigure}{0.3\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/pairwise_comparison_pval_inverted_pendulum.png}
+        \caption{Inverted Pendulum}
+    \end{subfigure}
+    \begin{subfigure}{0.3\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/pairwise_comparison_pval_ant.png}
+        \caption{Ant}
+    \end{subfigure}
+    \captionsetup{justification=centering} \
+    \caption{Pairwise p-values for each environment. Pairs with a p-value less than $\alpha = 0.05$ are highlighted in yellow.}
+    \label{fig:pairwise_comparison_pval}
+\end{figure}
+\begin{figure}[ht]
+    \centering
+    \begin{subfigure}{0.3\textwidth}
+        \centering
+            \includegraphics[width=\textwidth]{figures/pairwise_comparison_diff_pendulum.png}
+        \caption{Pendulum}
+    \end{subfigure}
+    \begin{subfigure}{0.3\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/pairwise_comparison_diff_inverted_pendulum.png}
+        \caption{Inverted Pendulum}
+    \end{subfigure}
+    \begin{subfigure}{0.3\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/pairwise_comparison_diff_ant.png}
+        \caption{Ant}
+    \end{subfigure}
+    \captionsetup{justification=centering} \
+    \caption{Pairwise differences for each environment. Pairs with a p-value less than $\alpha = 0.05$ are highlighted in yellow.}
+    \label{fig:pairwise_comparison_diff}
+\end{figure}
+
+
+We first aim to reject the null hypothesis, that the mean reward of any two configurations are the same. We do this by performing a two-sample t-test for each environment, for each configuration, for each environment. Recall that we used 5 seeds for each configuration and an alpha level of 0.05. The results are shown in the \autoref{fig:pairwise_comparison_pval}. We immediately notice that certain configurations have a performance advantage which is statistically significant over others. To quantify the effect size of the performance difference, \autoref{fig:pairwise_comparison_diff} shows the difference in performance between the configurations.
+
+\subsection{Identifying the best configurations}
+
+\paragraph{Pendulum}
+For the pendulum environment, we see that there is no signifcant difference caused by varying the critic learning rate (\autoref{fig:critic_lr_pval_pendulum}). However, there is a significant difference caused by varying the actor learning rate (\autoref{fig:actor_lr_pval_pendulum}). \autoref{fig:learning_rate_comparison_pendulum} shows the boxen plot of the performance of the different learning rate configurations. The best actor learning rate is \(3E-4\), which is the same as the baseline.
+
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}{0.4\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/learning_rate_comparison_pendulum.png}
+        \captionsetup{justification=centering}
+        \caption{Boxen plot, comparing performance of learning rate configurations}
+        \label{fig:learning_rate_comparison_pendulum}
+    \end{subfigure}
+    \\
+    \begin{subfigure}{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/critic_lr_pval_pendulum.png}
+        \captionsetup{justification=centering}
+        \caption{Critic LR p-values}
+        \label{fig:critic_lr_pval_pendulum}
+    \end{subfigure}
+    \begin{subfigure}{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/critic_lr_diff_pendulum.png}
+        \captionsetup{justification=centering}
+        \caption{Critic LR difference}
+        \label{fig:critic_lr_diff_pendulum}
+    \end{subfigure}
+    \begin{subfigure}{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/actor_lr_pval_pendulum.png}
+        \captionsetup{justification=centering}
+        \caption{Actor LR p-values}
+        \label{fig:actor_lr_pval_pendulum}
+    \end{subfigure}
+    \begin{subfigure}{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/actor_lr_diff_pendulum.png}
+        \captionsetup{justification=centering}
+        \caption{Actor LR difference}
+        \label{fig:actor_lr_diff_pendulum}
+    \end{subfigure}
+    \caption{Pendulum learning rate comparison}
+    \label{fig:pendulum_analysis}
+\end{figure}
+
+\paragraph{Inverted Pendulum}
+For the Inverted Pendulum environment, we again see that there is no significant difference caused by varying the critic learning rate (\autoref{fig:critic_lr_pval_inverted_pendulum}), although we see some evidence that the \(1E-3\) critic learning rate is superior.
+
+There is a significant difference caused by varying the actor learning rate (\autoref{fig:actor_lr_pval_inverted_pendulum}). \autoref{fig:learning_rate_comparison_inverted_pendulum} shows the boxen plot of the performance of the different learning rate configurations. The best actor learning rate is \(1E-3\), which differs from the baseline of \(3E-4\). We expect this higher learning rate to be better because the environment is so simple, and there is an advantage to be gained from a more aggressive learning rate. The effect size of the difference (\autoref{fig:actor_lr_diff_inverted_pendulum}) is not so large, but it is still significant.
+
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}{0.4\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/learning_rate_comparison_inverted_pendulum.png}
+        \captionsetup{justification=centering}
+        \caption{Boxen plot, comparing performance of learning rate configurations}
+        \label{fig:learning_rate_comparison_inverted_pendulum}
+    \end{subfigure}
+    \\
+    \begin{subfigure}{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/critic_lr_pval_inverted_pendulum.png}
+        \captionsetup{justification=centering}
+        \caption{Critic LR p-values}
+        \label{fig:critic_lr_pval_inverted_pendulum}
+    \end{subfigure}
+    \begin{subfigure}{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/critic_lr_diff_inverted_pendulum.png}
+        \captionsetup{justification=centering}
+        \caption{Critic LR difference}
+        \label{fig:critic_lr_diff_inverted_pendulum}
+    \end{subfigure}
+    \begin{subfigure}{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/actor_lr_pval_inverted_pendulum.png}
+        \captionsetup{justification=centering}
+        \caption{Actor LR p-values}
+        \label{fig:actor_lr_pval_inverted_pendulum}
+    \end{subfigure}
+    \begin{subfigure}{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/actor_lr_diff_inverted_pendulum.png}
+        \captionsetup{justification=centering}
+        \caption{Actor LR difference}
+        \label{fig:actor_lr_diff_inverted_pendulum}
+    \end{subfigure}
+    \caption{Inverted Pendulum learning rate comparison}
+    \label{fig:inverted_pendulum_analysis}
+\end{figure}
+
+\paragraph{Ant}
+For the Ant environment, we again see that there is no significant difference caused by varying the critic learning rate (\autoref{fig:critic_lr_pval_ant}). However, there is a significant difference caused by varying the actor learning rate (\autoref{fig:actor_lr_pval_ant}). The effect size of the difference (\autoref{fig:actor_lr_diff_ant}) is much larger than that of the other two environments, indicating the importance of tuning the actor learning rate for this complex environment.
+
+\autoref{fig:learning_rate_comparison_ant} shows the boxen plot of the performance of the different learning rate configurations. The best actor learning rate is \(3E-4\), which is the same as the baseline.
+
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}{0.4\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/learning_rate_comparison_ant.png}
+        \captionsetup{justification=centering}
+        \caption{Boxen plot, comparing performance of learning rate configurations}
+        \label{fig:learning_rate_comparison_ant}
+    \end{subfigure}
+    \\
+    \begin{subfigure}{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/critic_lr_pval_ant.png}
+        \captionsetup{justification=centering}
+        \caption{Critic LR p-values}
+        \label{fig:critic_lr_pval_ant}
+    \end{subfigure}
+    \begin{subfigure}{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/critic_lr_diff_ant.png}
+        \captionsetup{justification=centering}
+        \caption{Critic LR difference}
+        \label{fig:critic_lr_diff_ant}
+    \end{subfigure}
+    \begin{subfigure}{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/actor_lr_pval_ant.png}
+        \captionsetup{justification=centering}
+        \caption{Actor LR p-values}
+        \label{fig:actor_lr_pval_ant}
+    \end{subfigure}
+    \begin{subfigure}{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/actor_lr_diff_ant.png}
+        \captionsetup{justification=centering}
+        \caption{Actor LR difference}
+        \label{fig:actor_lr_diff_ant}
+    \end{subfigure}
+    \caption{Ant learning rate comparison}
+    \label{fig:ant_analysis}
+\end{figure}
 
 \section{Conclusion}
 Summarize the main findings of the report. Discuss the implications of your results, acknowledge any limitations, and suggest potential future work.

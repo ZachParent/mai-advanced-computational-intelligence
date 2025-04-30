@@ -96,21 +96,29 @@ For environments involving continuous action spaces, specifically MuJoCo tasks, 
 \end{itemize}
 
 \subsection{Environments}
-- we selected the pendulum, inverted pendulum, and ant environments because they feature continuous action spaces.
-- the pendulum and inverted pendulum are also simple to understand, and the ant environment is a more complex task that is still relatively simple to understand.
+We evaluated the PPO algorithm on three environments from the Gymnasium library \cite{towers2024gymnasium}, selected for their continuous action spaces: Pendulum-v1, InvertedPendulum-v4, and Ant-v4. The Pendulum and Inverted Pendulum environments represent classic control problems with relatively simple dynamics, while the Ant environment presents a more complex locomotion task. This selection allows for testing the algorithm's performance across varying levels of complexity within continuous control scenarios.
 
 \subsection{Experiment Design}
-- we created an abstract agent class and a class for the PPO agent
-- we used the gymnasium library to create the environment
-- we created a class RunConfig to store the configuration of the experiment
-- we used a seed for the environment, agent, and training process, to ensure reproducibility
-- we generated 5 runs for each configuration, to allow for statistical analysis
-- we performed a grid search over 3 critic learning rates and 3 actor learning rates, centered around the values used in the 37 implementation details of PPO \cite{shengyi2022the37implementation} (actor learning rates: 1E-3, \textbf{3E-4}, 1E-4; critic learning rates: 3E-3, \textbf{1E-3}, 3E-4)
-- we considered the average episode reward over the last 20 episodes of training, to collect a better estimate of the performance of each agent
-- by performing independent T-tests, we could determine if the agent's performance was signifcantly affected by the learning rates, in each environment
-- a total of 135 runs were performed, 45 for each environment, 9 configurations per environment
-$$5 \text{ seeds} \times 3 \text{ critic learning rates} \times 3 \text{ actor learning rates} = 45 \text{ runs per environment}$$
-$$45 \text{ runs per environment} \times 3 \text{ environments} = 135 \text{ runs}$$
+
+\paragraph{Setup}
+To structure the experiments, an abstract \texttt{Agent} class was defined, along with a specific implementation for the \texttt{PPOAgent}. The Gymnasium library facilitated environment creation and interaction. A \texttt{RunConfig} class was implemented to manage experiment configurations, ensuring parameters were consistently applied. Reproducibility was addressed by seeding the environment, agent initialization, and training process for each run.
+
+\paragraph{Parameter Sweep and Replication}
+To assess the impact of learning rates on performance, we conducted a grid search over different configurations for the actor and critic optimizers. The searched values were centered around those suggested by Huang et al. \cite{shengyi2022the37implementation}:
+\begin{itemize}
+    \item Actor Learning Rates: \(1 \times 10^{-3}\), \textbf{\(3 \times 10^{-4}\)} (baseline), \(1 \times 10^{-4}\)
+    \item Critic Learning Rates: \(3 \times 10^{-3}\), \textbf{\(1 \times 10^{-3}\)} (baseline), \(3 \times 10^{-4}\)
+\end{itemize}
+This resulted in 9 distinct learning rate configurations per environment. For statistical robustness, each configuration was executed with 5 different random seeds.
+
+\paragraph{Performance Evaluation}
+Agent performance was measured by averaging the episodic reward over the final 20 episodes of training. This metric provides a stable estimate of the converged performance for each run. To determine if observed performance differences between learning rate configurations were statistically significant within each environment, independent two-sample t-tests were planned, and an alpha level of 0.05 was fixed a priori.
+
+\paragraph{Total Runs}
+The experimental setup resulted in a total of 45 runs per environment (3 actor rates \(\times\) 3 critic rates \(\times\) 5 seeds). Across the three environments, this amounted to 135 individual training runs.
+\[
+(3 \text{ actor learning rates} \times 3 \text{ critic learning rates} \times 5 \text{ seeds}) \times 3 \text{ environments} = 135 \text{ total runs}
+\]
 
 \section{Results}
 \begin{figure}[ht]

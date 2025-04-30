@@ -31,11 +31,21 @@
 
 \begin{document}
 
-\maketitle
+\begin{titlepage} % Start titlepage environment
+    \maketitle
+    % \thispagestyle{empty} % Not needed, titlepage environment handles this
 
-\begin{abstract}
-Proximal Policy Optimization (PPO) is a widely-used reinforcement learning algorithm, but its performance often depends on hyperparameter tuning. This report investigates the sensitivity of PPO to actor and critic learning rates across three continuous control tasks (Pendulum-v1, InvertedPendulum-v5, Ant-v5) using the Gymnasium library. Following established implementation details, we performed a grid search over learning rates, executing multiple runs per configuration for statistical robustness via t-tests. Results indicate that within the tested range (\(3 \times 10^{-3}\) to \(3 \times 10^{-4}\)), the critic learning rate had no statistically significant effect on final performance across the environments (\(p > 0.05\)). In contrast, the actor learning rate significantly impacted results, with the optimal rate varying by environment: the baseline \(3 \times 10^{-4}\) was best for Pendulum and Ant, while a higher rate (\(1 \times 10^{-3}\)) excelled in the simpler InvertedPendulum task. These findings highlight the critical role of the actor learning rate and its potential environment-dependency in achieving optimal PPO performance.
-\end{abstract}
+    \begin{abstract}
+    Proximal Policy Optimization (PPO) is a widely-used reinforcement learning algorithm, but its performance often depends on hyperparameter tuning. This report investigates the sensitivity of PPO to actor and critic learning rates across three continuous control tasks (Pendulum-v1, InvertedPendulum-v5, Ant-v5) using the Gymnasium library. Following established implementation details, we performed a grid search over learning rates, executing multiple runs per configuration for statistical robustness via t-tests. Results indicate that within the tested range (\(3 \times 10^{-3}\) to \(3 \times 10^{-4}\)), the critic learning rate had no statistically significant effect on final performance across the environments (\(p > 0.05\)). In contrast, the actor learning rate significantly impacted results, with the optimal rate varying by environment: the baseline \(3 \times 10^{-4}\) was best for Pendulum and Ant, while a higher rate (\(1 \times 10^{-3}\)) excelled in the simpler InvertedPendulum task. These findings highlight the critical role of the actor learning rate and its potential environment-dependency in achieving optimal PPO performance.
+    \end{abstract}
+    \tableofcontents
+    \thispagestyle{empty}
+
+\end{titlepage} % End titlepage environment
+
+
+% \clearpage % Not needed, titlepage ends the page
+% \setcounter{page}{1} % Usually not needed, numbering starts correctly after titlepage
 
 \section{Introduction}
 Reinforcement Learning (RL) offers powerful techniques for training agents to perform complex tasks through interaction with an environment. Among the various RL algorithms, Proximal Policy Optimization (PPO) stands out as a popular and effective choice due to its balance of sample efficiency, implementation simplicity, and robust performance across diverse domains \cite{schulman2017proximalpolicyoptimizationalgorithms}. However, like many deep RL algorithms, PPO's performance can be sensitive to the choice of hyperparameters.
@@ -57,6 +67,8 @@ The following general PPO implementation details were adopted:
     \item \textbf{Advantage Normalization:} Calculated advantages were normalized at the minibatch level by subtracting the mean and dividing by the standard deviation.
     \item \textbf{Global Gradient Clipping:} The gradients of the policy and value networks were rescaled during each update iteration to ensure the global L2 norm did not exceed 0.5. This technique has been shown to offer potential performance benefits \cite{andrychowicz2021what}.
     \item \textbf{Separate Networks:} Distinct neural networks were used for the policy (actor) and value (critic) functions. The architectures are outlined below:
+
+    \begin{minipage}{0.9\textwidth}
     \begin{lstlisting}[language=Python]
 value_network = Sequential(
     layer_init(Linear(np.array(envs.single_observation_space.shape).prod(), 64)),
@@ -77,6 +89,7 @@ policy_network = Sequential(
 # action_dist = Categorical(policy_network(observation))
 # action = action_dist.sample()
     \end{lstlisting}
+    \end{minipage}
 \end{itemize}
 
 \subsubsection{MuJoCo-Specific PPO Algorithm Details}
@@ -104,17 +117,7 @@ To assess the impact of learning rates on performance, we conducted a grid searc
 \end{itemize}
 This resulted in 9 distinct learning rate configurations per environment. For statistical robustness, each configuration was executed with 5 different random seeds.
 
-\paragraph{Performance Evaluation}
-Agent performance was measured by averaging the episodic reward over the final 20 episodes of training. This metric provides a stable estimate of the converged performance for each run. To determine if observed performance differences between learning rate configurations were statistically significant within each environment, independent two-sample t-tests were planned, and an alpha level of 0.05 was fixed a priori.
-
-\paragraph{Total Runs}
-The experimental setup resulted in a total of 45 runs per environment (3 actor rates \(\times\) 3 critic rates \(\times\) 5 seeds). Across the three environments, this amounted to 135 individual training runs.
-\[
-(3 \text{ actor learning rates} \times 3 \text{ critic learning rates} \times 5 \text{ seeds}) \times 3 \text{ environments} = 135 \text{ total runs}
-\]
-
-\section{Results}
-\begin{figure}[ht]
+\begin{figure}[ht!]
     \centering
     \begin{subfigure}{0.48\textwidth}
         \centering
@@ -135,6 +138,18 @@ The experimental setup resulted in a total of 45 runs per environment (3 actor r
     \caption{Rewards curves for each environment. Each row represents a different seed, each column represents a different learning rate configuration}
     \label{fig:rewards_curves}
 \end{figure}
+
+\paragraph{Performance Evaluation}
+Agent performance was measured by averaging the episodic reward over the final 20 episodes of training. This metric provides a stable estimate of the converged performance for each run. To determine if observed performance differences between learning rate configurations were statistically significant within each environment, independent two-sample t-tests were planned, and an alpha level of 0.05 was fixed a priori.
+
+\paragraph{Total Runs}
+The experimental setup resulted in a total of 45 runs per environment (3 actor rates \(\times\) 3 critic rates \(\times\) 5 seeds). Across the three environments, this amounted to 135 individual training runs.
+\[
+(3 \text{ actor learning rates} \times 3 \text{ critic learning rates} \times 5 \text{ seeds}) \times 3 \text{ environments} = 135 \text{ total runs}
+\]
+
+\clearpage
+\section{Results}
 
 The configurations for each environment were run long enough to converge. The reward curves, including the actual episode reward and the moving average reward, are shown in  \autoref{fig:rewards_curves}. The reward from the final 20 episodes of each run were averaged to and used as the measure of performance for that run. Further analysis of this performance follows.
 
@@ -190,7 +205,7 @@ We first aim to reject the null hypothesis, that the mean reward of any two conf
 \paragraph{Pendulum}
 For the pendulum environment, we see that there is no signifcant difference caused by varying the critic learning rate (\autoref{fig:critic_lr_pval_pendulum}). However, there is a significant difference caused by varying the actor learning rate (\autoref{fig:actor_lr_pval_pendulum}). \autoref{fig:learning_rate_comparison_pendulum} shows the boxen plot of the performance of the different learning rate configurations. The best actor learning rate is \(3E-4\), which is the same as the baseline.
 
-\begin{figure}[h!]
+\begin{figure}[htbp]
     \centering
     \begin{subfigure}{0.4\textwidth}
         \centering
@@ -232,12 +247,13 @@ For the pendulum environment, we see that there is no signifcant difference caus
     \label{fig:pendulum_analysis}
 \end{figure}
 
+\clearpage
 \paragraph{Inverted Pendulum}
 For the Inverted Pendulum environment, we again see that there is no significant difference caused by varying the critic learning rate (\autoref{fig:critic_lr_pval_inverted_pendulum}), although we see some evidence that the \(1E-3\) critic learning rate is superior.
 
 There is a significant difference caused by varying the actor learning rate (\autoref{fig:actor_lr_pval_inverted_pendulum}). \autoref{fig:learning_rate_comparison_inverted_pendulum} shows the boxen plot of the performance of the different learning rate configurations. The best actor learning rate is \(1E-3\), which differs from the baseline of \(3E-4\). We expect this higher learning rate to be better because the environment is so simple, and there is an advantage to be gained from a more aggressive learning rate. The effect size of the difference (\autoref{fig:actor_lr_diff_inverted_pendulum}) is not so large, but it is still significant.
 
-\begin{figure}[h!]
+\begin{figure}[htbp]
     \centering
     \begin{subfigure}{0.4\textwidth}
         \centering
@@ -278,13 +294,14 @@ There is a significant difference caused by varying the actor learning rate (\au
     \caption{Inverted Pendulum learning rate comparison}
     \label{fig:inverted_pendulum_analysis}
 \end{figure}
+\clearpage
 
 \paragraph{Ant}
 For the Ant environment, we again see that there is no significant difference caused by varying the critic learning rate (\autoref{fig:critic_lr_pval_ant}). However, there is a significant difference caused by varying the actor learning rate (\autoref{fig:actor_lr_pval_ant}). The effect size of the difference (\autoref{fig:actor_lr_diff_ant}) is much larger than that of the other two environments, indicating the importance of tuning the actor learning rate for this complex environment.
 
 \autoref{fig:learning_rate_comparison_ant} shows the boxen plot of the performance of the different learning rate configurations. The best actor learning rate is \(3E-4\), which is the same as the baseline.
 
-\begin{figure}[h!]
+\begin{figure}[htbp]
     \centering
     \begin{subfigure}{0.4\textwidth}
         \centering
@@ -326,6 +343,7 @@ For the Ant environment, we again see that there is no significant difference ca
     \label{fig:ant_analysis}
 \end{figure}
 
+\clearpage
 \section{Conclusion}
 
 \paragraph{Summary of Work}
@@ -341,7 +359,7 @@ Our analysis revealed distinct patterns regarding learning rate sensitivity. Acr
 This study has several limitations. The investigation was confined to the PPO algorithm and only three environments with continuous action spaces. The grid search explored a limited range of learning rates, and other crucial hyperparameters (e.g., batch size, number of epochs per update, GAE lambda, clipping parameter \(\epsilon\)) were held constant based on common practices. Furthermore, the neural network architecture for the actor and critic was fixed. Interactions between learning rates and these other hyperparameters were not explored.
 
 \paragraph{Future Directions}
-Future work could expand upon these findings by: exploring a wider range of learning rates or employing adaptive learning rate schedules; testing sensitivity to other PPO hyperparameters; evaluating performance on a broader set of environments, including those with discrete action spaces or different simulators; investigating the influence of network architecture choices; and comparing PPO's sensitivity to that of other reinforcement learning algorithms under similar experimental conditions.
+Future work could expand upon these findings by: exploring a wider range of learning rates or employing adaptive learning rate schedules; testing sensitivity to other PPO hyperparameters; investigating the influence of network architecture choices; and comparing PPO's sensitivity to that of other reinforcement learning algorithms under similar experimental conditions.
 
 \bibliographystyle{plain} % Style for the bibliography (e.g., plain, unsrt, alpha)
 \bibliography{references} % Name of your .bib file (without the .bib extension)

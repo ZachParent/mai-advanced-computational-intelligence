@@ -39,22 +39,20 @@ This is a brief summary of the report's content, highlighting the key findings a
 \section{Methodology}
 
 \subsection{Algorithm}
-- we selected the PPO algorithm for its balance between sample efficiency and stability, and because it is a popular algorithm for a variety of tasks, and it's state of the art
-- we followed implementation details from the 37 implementation details paper \cite{shengyi2022the37implementation}
+The Proximal Policy Optimization (PPO) algorithm was selected due to its balance between sample efficiency and stability. It is a widely-used, state-of-the-art algorithm suitable for various reinforcement learning tasks. Our implementation closely follows the details outlined in the work by Huang et al. \cite{shengyi2022the37implementation}.
 
 \subsubsection{General PPO Algorithm Details}
-- Orthogonal Initialization of Weights and Constant Initialization of biases
-- The Adam Optimizer’s Epsilon Parameter (ppo2/model.py#L100) Code-level Optimizations PPO sets the epsilon parameter to 1e-5
-- Adam Learning Rate Annealing (ppo2/ppo2.py#L133-L135) Code-level Optimizations
-- The Adam optimizer’s learning rate could be either constant or set to decay. In MuJoCo, the learning rate linearly decays from 3e-4 to 0
-- Generalized Advantage Estimation
-- Normalization of Advantages (ppo2/model.py#L139) Code-level Optimizations
-- After calculating the advantages based on GAE, PPO normalizes the advantages by subtracting their mean and dividing them by their standard deviation. In particular, this normalization happens at the minibatch level instead of the whole batch level!
-- Global Gradient Clipping (ppo2/model.py#L102-L108) Code-level Optimizations
-- For each update iteration in an epoch, PPO rescales the gradients of the policy and value network so that the “global l2 norm” (i.e., the norm of the concatenated gradients of all parameters) does not exceed 0.5.
-Andrychowicz, et al. (2021) \cite{andrychowicz2021what} find global gradient clipping to offer a small performance boost (decision C68, figure 34).
-- separate networks for policy and value function
-  $$  value_network = Sequential(
+The following general PPO implementation details were adopted:
+\begin{itemize}
+    \item \textbf{Weight Initialization:} Orthogonal initialization for weights and constant initialization for biases were used.
+    \item \textbf{Adam Optimizer Epsilon:} The epsilon parameter of the Adam optimizer was set to \(1 \times 10^{-5}\) (Code reference: \texttt{ppo2/model.py\#L100}).
+    \item \textbf{Adam Learning Rate Annealing:} The learning rate for the Adam optimizer was linearly decayed from \(3 \times 10^{-4}\) to 0 over the course of training, following common practice for MuJoCo environments (Code reference: \texttt{ppo2/ppo2.py\#L133-L135}).
+    \item \textbf{Generalized Advantage Estimation (GAE):} GAE was employed for estimating advantage values.
+    \item \textbf{Advantage Normalization:} Calculated advantages were normalized at the minibatch level by subtracting the mean and dividing by the standard deviation (Code reference: \texttt{ppo2/model.py\#L139}).
+    \item \textbf{Global Gradient Clipping:} The gradients of the policy and value networks were rescaled during each update iteration to ensure the global L2 norm did not exceed 0.5. This technique has been shown to offer potential performance benefits \cite{andrychowicz2021what}.
+    \item \textbf{Separate Networks:} Distinct neural networks were used for the policy (actor) and value (critic) functions. The architectures are outlined below:
+    \begin{verbatim}
+value_network = Sequential(
     layer_init(Linear(np.array(envs.single_observation_space.shape).prod(), 64)),
     Tanh(),
     layer_init(Linear(64, 64)),
@@ -68,19 +66,21 @@ policy_network = Sequential(
     Tanh(),
     layer_init(Linear(64, envs.single_action_space.n), std=0.01),
 )
-value = value_network(observation)
-action = Categorical(policy_network(observation)).sample()$$
+# Usage example:
+# value = value_network(observation)
+# action_dist = Categorical(policy_network(observation))
+# action = action_dist.sample()
+    \end{verbatim}
+\end{itemize}
 
-\subsubsection{Mujoco PPO Algorithm Details}
-- Continuous actions via normal distributions (common/distributions.py#L103-L104) Theory
-  - Policy gradient methods (including PPO) assume the continuous actions are sampled from a normal distribution. So to create such distribution, the neural network needs to output the mean and standard deviation of the continuous action.
-- State-independent log standard deviation (common/distributions.py#L104) Theory
-  - The implementation outputs the logits for the mean, but instead of outputting the logits for the standard deviation, it outputs the logarithm of the standard deviation. In addition, this log std is set to be state-independent and initialized to be 0.
-- Handling of action clipping to valid range and storage (common/cmd_util.py#L99-L100) Code-level Optimizations
-  - After a continuous action is sampled, such action could be invalid because it could exceed the valid range of continuous actions in the environment. To avoid this, add applies the rapper to clip the action into the valid range. However, the original unclipped action is stored as part of the episodic data
-- Reward Scaling (common/vec_env/vec_normalize.py#L28) Environment Preprocessing
-  - The VecNormalize also applies a certain discount-based scaling scheme, where the rewards are divided by the standard deviation of a rolling discounted sum of the rewards (without subtracting and re-adding the mean).
-  - Engstrom, Ilyas, et al., (2020) \cite{Engstrom2020Implementation} reported that reward scaling can significantly affect the performance of the algorithm and recommends the use of reward scaling.
+\subsubsection{MuJoCo-Specific PPO Algorithm Details}
+For environments involving continuous action spaces, specifically MuJoCo tasks, the following details were incorporated:
+\begin{itemize}
+    \item \textbf{Continuous Actions:} Actions were sampled from a Normal distribution. The policy network outputs the mean, while the standard deviation is handled separately.
+    \item \textbf{State-Independent Log Standard Deviation:} The logarithm of the standard deviation for the action distribution was maintained as a state-independent parameter, initialized to zero (Code reference: \texttt{common/distributions.py\#L104}).
+    \item \textbf{Action Clipping and Storage:} Sampled continuous actions were clipped to the valid range defined by the environment. However, the original, unclipped action was stored in the experience buffer.
+    \item \textbf{Reward Scaling:} Rewards were scaled by dividing them by the standard deviation of a rolling discounted sum of rewards. This technique, often implemented via wrappers like \texttt{VecNormalize}, is recommended for potentially improving performance \cite{Engstrom2020Implementation}.
+\end{itemize}
 
 \subsection{Environments}
 - we selected the pendulum, inverted pendulum, and ant environments because they feature continuous action spaces. the pendulum and inverted pendulum are also simple to understand, and the ant environment is a more complex task that is still relatively simple to understand.
@@ -106,7 +106,7 @@ Refer to Figure \ref{fig:example} for an example.
     \label{fig:example}
 \end{figure}
 
-Discuss the results and their significance. For instance, we observed that... This contradicts the findings of \cite{dummy_key2}.
+Discuss the results and their significance. For instance, we observed that...
 
 \section{Conclusion}
 Summarize the main findings of the report. Discuss the implications of your results, acknowledge any limitations, and suggest potential future work.

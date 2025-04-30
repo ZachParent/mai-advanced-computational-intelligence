@@ -12,10 +12,6 @@
 \usepackage{caption} % Add the caption package
 
 \hypersetup{
-    colorlinks=true,
-    linkcolor=blue,
-    filecolor=magenta,
-    urlcolor=cyan,
     pdftitle={My Report Title},
     pdfpagemode=FullScreen,
     }
@@ -29,8 +25,8 @@
     showstringspaces=false,
 }
 
-\title{My Research Report Title}
-\author{Your Name \\ Your Affiliation}
+\title{Optimizing PPO Hyperparameters \\ for Continuous Control Tasks}
+\author{Zachary Parent \\ Universitat Politècnica de Catalunya}
 \date{\today}
 
 \begin{document}
@@ -38,16 +34,13 @@
 \maketitle
 
 \begin{abstract}
-This is a brief summary of the report's content, highlighting the key findings and conclusions.
+Proximal Policy Optimization (PPO) is a widely-used reinforcement learning algorithm, but its performance often depends on hyperparameter tuning. This report investigates the sensitivity of PPO to actor and critic learning rates across three continuous control tasks (Pendulum-v1, InvertedPendulum-v5, Ant-v5) using the Gymnasium library. Following established implementation details, we performed a grid search over learning rates, executing multiple runs per configuration for statistical robustness via t-tests. Results indicate that within the tested range (\(3 \times 10^{-3}\) to \(3 \times 10^{-4}\)), the critic learning rate had no statistically significant effect on final performance across the environments (\(p > 0.05\)). In contrast, the actor learning rate significantly impacted results, with the optimal rate varying by environment: the baseline \(3 \times 10^{-4}\) was best for Pendulum and Ant, while a higher rate (\(1 \times 10^{-3}\)) excelled in the simpler InvertedPendulum task. These findings highlight the critical role of the actor learning rate and its potential environment-dependency in achieving optimal PPO performance.
 \end{abstract}
 
 \section{Introduction}
-- background on the task
-  - we were asked to implement a reinforcement learning algorithm to solve a task
-  - we used the gymnasium library to create the environment
-  - we chose PPO as our algorithm
-  - we applied the algorithm to multiple environments
-  - we were curious about how different configurations of the actor and critic learning rates affected the performance of the algorithm, with respect to each environment
+Reinforcement Learning (RL) offers powerful techniques for training agents to perform complex tasks through interaction with an environment. Among the various RL algorithms, Proximal Policy Optimization (PPO) stands out as a popular and effective choice due to its balance of sample efficiency, implementation simplicity, and robust performance across diverse domains \cite{schulman2017proximalpolicyoptimizationalgorithms}. However, like many deep RL algorithms, PPO's performance can be sensitive to the choice of hyperparameters.
+
+This report focuses on investigating the impact of two critical hyperparameters: the learning rates for the actor (policy) and critic (value function) networks within a PPO agent. Specifically, we aim to understand how different combinations of these learning rates affect the final performance of the PPO algorithm when applied to a set of standard continuous control benchmark tasks. We utilized the Gymnasium library \cite{towers2024gymnasium} to implement and test the agent on the Pendulum-v1, InvertedPendulum-v5, and Ant-v5 environments, representing varying levels of task complexity. The subsequent sections detail our methodology, present the experimental results including statistical analyses, and conclude with a discussion of the findings, limitations, and potential future work.
 
 \section{Methodology}
 
@@ -96,7 +89,7 @@ For environments involving continuous action spaces, specifically MuJoCo tasks, 
 \end{itemize}
 
 \subsection{Environments}
-We evaluated the PPO algorithm on three environments from the Gymnasium library \cite{towers2024gymnasium}, selected for their continuous action spaces: Pendulum-v1, InvertedPendulum-v4, and Ant-v4. The Pendulum and Inverted Pendulum environments represent classic control problems with relatively simple dynamics, while the Ant environment presents a more complex locomotion task. This selection allows for testing the algorithm's performance across varying levels of complexity within continuous control scenarios.
+We evaluated the PPO algorithm on three environments from the Gymnasium library \cite{towers2024gymnasium}, selected for their continuous action spaces: Pendulum-v1, InvertedPendulum-v5, and Ant-v5. The Pendulum and Inverted Pendulum environments represent classic control problems with relatively simple dynamics, while the Ant environment presents a more complex locomotion task. This selection allows for testing the algorithm's performance across varying levels of complexity within continuous control scenarios.
 
 \subsection{Experiment Design}
 
@@ -334,7 +327,21 @@ For the Ant environment, we again see that there is no significant difference ca
 \end{figure}
 
 \section{Conclusion}
-Summarize the main findings of the report. Discuss the implications of your results, acknowledge any limitations, and suggest potential future work.
+
+\paragraph{Summary of Work}
+This report detailed the implementation of the Proximal Policy Optimization (PPO) algorithm, closely adhering to the best practices outlined by Huang et al. \cite{shengyi2022the37implementation}. We conducted a systematic investigation into the effects of actor and critic learning rates on agent performance across three continuous control environments from the Gymnasium library: Pendulum-v1, InvertedPendulum-v5, and Ant-v5.
+
+\paragraph{Rigorous Experimental Design}
+The experimental methodology prioritized statistical robustness and reproducibility. By employing multiple random seeds (5 per configuration), performing a grid search over 9 learning rate combinations per environment, and utilizing independent t-tests with a pre-defined alpha level (\(\alpha=0.05\)), we aimed to draw reliable conclusions about the impact of these specific hyperparameters. This careful setup allowed for the identification of statistically significant performance differences.
+
+\paragraph{Key Findings on Learning Rates}
+Our analysis revealed distinct patterns regarding learning rate sensitivity. Across all three tested environments, variations in the \textit{critic} learning rate within the tested range (\(3 \times 10^{-3}\) to \(3 \times 10^{-4}\)) did not yield statistically significant differences in final performance. Conversely, the \textit{actor} learning rate proved to be a critical hyperparameter. While the baseline rate (\(3 \times 10^{-4}\)) was optimal for Pendulum and the more complex Ant environment, a higher rate (\(1 \times 10^{-3}\)) performed best on the simpler Inverted Pendulum task. This suggests that while the critic's learning rate might be relatively stable, the optimal actor learning rate can be environment-dependent, potentially correlating with task complexity, and significantly impacts final agent performance, especially in challenging domains like Ant.
+
+\paragraph{Limitations}
+This study has several limitations. The investigation was confined to the PPO algorithm and only three environments with continuous action spaces. The grid search explored a limited range of learning rates, and other crucial hyperparameters (e.g., batch size, number of epochs per update, GAE lambda, clipping parameter \(\epsilon\)) were held constant based on common practices. Furthermore, the neural network architecture for the actor and critic was fixed. Interactions between learning rates and these other hyperparameters were not explored.
+
+\paragraph{Future Directions}
+Future work could expand upon these findings by: exploring a wider range of learning rates or employing adaptive learning rate schedules; testing sensitivity to other PPO hyperparameters; evaluating performance on a broader set of environments, including those with discrete action spaces or different simulators; investigating the influence of network architecture choices; and comparing PPO's sensitivity to that of other reinforcement learning algorithms under similar experimental conditions.
 
 \bibliographystyle{plain} % Style for the bibliography (e.g., plain, unsrt, alpha)
 \bibliography{references} % Name of your .bib file (without the .bib extension)

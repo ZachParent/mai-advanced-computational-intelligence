@@ -8,6 +8,9 @@
 \usepackage[T1]{fontenc}    % Font encoding
 \usepackage{hyperref} % For hyperlinks (optional, but good practice)
 \usepackage{listings}
+\usepackage{subcaption}
+\usepackage{caption} % Add the caption package
+
 \hypersetup{
     colorlinks=true,
     linkcolor=blue,
@@ -93,27 +96,42 @@ For environments involving continuous action spaces, specifically MuJoCo tasks, 
 \end{itemize}
 
 \subsection{Environments}
-- we selected the pendulum, inverted pendulum, and ant environments because they feature continuous action spaces. the pendulum and inverted pendulum are also simple to understand, and the ant environment is a more complex task that is still relatively simple to understand.
+- we selected the pendulum, inverted pendulum, and ant environments because they feature continuous action spaces.
+- the pendulum and inverted pendulum are also simple to understand, and the ant environment is a more complex task that is still relatively simple to understand.
 
 \subsection{Experiment Design}
 - we created an abstract agent class and a class for the PPO agent
 - we used the gymnasium library to create the environment
-- we follow
-
-For example, we used the following equation:
-\[ E = mc^2 \]
-This methodology was chosen because...
+- we created a class RunConfig to store the configuration of the experiment
+- we used a seed for the environment, agent, and training process, to ensure reproducibility
+- we generated 5 runs for each configuration, to allow for statistical analysis
+- we performed a grid search over 3 critic learning rates and 3 actor learning rates, centered around the values used in the 37 implementation details of PPO \cite{shengyi2022the37implementation} (actor learning rates: 1E-3, \textbf{3E-4}, 1E-4; critic learning rates: 3E-3, \textbf{1E-3}, 3E-4)
+- we considered the average episode reward over the last 20 episodes of training, to collect a better estimate of the performance of each agent
+- by performing independent T-tests, we could determine if the agent's performance was signifcantly affected by the learning rates, in each environment
+- a total of 135 runs were performed, 45 for each environment, 9 configurations per environment
+$$5 \text{ seeds} \times 3 \text{ critic learning rates} \times 3 \text{ actor learning rates} = 45 \text{ runs per environment}$$
+$$45 \text{ runs per environment} \times 3 \text{ environments} = 135 \text{ runs}$$
 
 \section{Results}
-Present the findings of your research. Use figures, tables, and text to clearly show the results.
-Refer to Figure \ref{fig:example} for an example.
-
-\begin{figure}[htbp] % h=here, t=top, b=bottom, p=page of floats
+\begin{figure}[ht]
     \centering
-    % \includegraphics[width=0.8\textwidth]{path/to/your/figure.png} % Uncomment and replace path
-    \fbox{Your figure would go here} % Placeholder for the figure
-    \caption{An example figure caption.}
-    \label{fig:example}
+    \begin{subfigure}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/individual_rewards_curves_pendulum.png}
+        \caption{Pendulum}
+    \end{subfigure}
+    \begin{subfigure}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/individual_rewards_curves_inverted_pendulum.png}
+        \caption{Inverted Pendulum}
+    \end{subfigure}
+    \begin{subfigure}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/individual_rewards_curves_ant.png}
+        \caption{Ant}
+    \end{subfigure}
+    \captionsetup{justification=centering} \
+    \caption{Rewards curves for each environment. Each row represents a different seed, each column represents a different learning rate configuration}
 \end{figure}
 
 Discuss the results and their significance. For instance, we observed that...

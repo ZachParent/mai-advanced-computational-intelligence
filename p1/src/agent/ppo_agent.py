@@ -66,9 +66,7 @@ class PPOAgent(Agent):
             raise ValueError("PPOAgent requires ppo_hyperparams in RunConfig")
         hp: PPOHyperparams = self.run_config.ppo_hyperparams
 
-        # Assuming 1 environment for now, could parallelize later
-        num_envs = 1
-        self.buffer_capacity = num_envs * self.run_config.num_steps
+        self.buffer_capacity = self.run_config.num_steps
         if self.buffer_capacity % hp.num_minibatches != 0:
             print(
                 f"Warning: Buffer capacity ({self.buffer_capacity}) not divisible by num_minibatches ({hp.num_minibatches})"
@@ -119,14 +117,11 @@ class PPOAgent(Agent):
             eps=hp.adam_epsilon,
         )
 
-        # Action scaling depends on the environment's action space range
         # Using Tanh in actor mean output layer assumes initial range [-1, 1]
-        # Scaling to environment range happens in get_distribution
         self.action_scale = (self.action_high - self.action_low) / 2.0
         self.action_bias = (self.action_high + self.action_low) / 2.0
 
     def get_distribution(self, state: torch.Tensor) -> Normal:
-        # Actor outputs mean in range [-1, 1]
         action_mean_normalized = self.actor_mean(state.to(DEVICE))
         # Scale mean to environment's action space range
         action_mean = action_mean_normalized * self.action_scale + self.action_bias
@@ -134,7 +129,6 @@ class PPOAgent(Agent):
         return Normal(action_mean, std)
 
     def act(self, state: np.ndarray) -> tuple[torch.Tensor, np.ndarray, torch.Tensor]:
-        """Returns: unclipped action tensor, clipped action numpy array, log prob tensor"""
         state_tensor = torch.FloatTensor(state)
         with torch.no_grad():
             dist = self.get_distribution(state_tensor)
@@ -142,11 +136,9 @@ class PPOAgent(Agent):
             log_prob = einops.reduce(
                 dist.log_prob(action_unclipped), "1 action -> ()", reduction="sum"
             )
-        # Clip the action *only* for interacting with the environment
         action_clipped = torch.clamp(
             action_unclipped, self.action_low, self.action_high
         )
-        # Return the UNCLIPPED tensor, the CLIPPED numpy array, and the log_prob (of unclipped)
         return action_unclipped, action_clipped.cpu().numpy(), log_prob
 
     def store_transition(
@@ -158,7 +150,7 @@ class PPOAgent(Agent):
         terminated: bool,
         log_prob: torch.Tensor,
     ):
-        """Stores the UNCLIPPED action tensor along with other data"""
+        # Store the UNCLIPPED action tensor along with other data
         self.buffer.append(
             (state, action_unclipped, reward, next_state, terminated, log_prob)
         )

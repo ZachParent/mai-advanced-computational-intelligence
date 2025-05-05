@@ -1,4 +1,3 @@
-# %%
 import sys
 from pathlib import Path
 from typing import Dict, List
@@ -30,7 +29,6 @@ DEFAULT_ALPHA = 0.05
 SEEDS_PER_CONFIG = 5  # Assuming 5 seeds per config group
 
 
-# %% Loading and Preparation Functions
 def load_history_data(
     configs: List[RunConfig], results_dir: Path
 ) -> Dict[int, pd.DataFrame]:
@@ -159,7 +157,6 @@ def prepare_analysis_dataframe(
     return configs_df
 
 
-# %% Plotting Functions
 def plot_individual_rewards(
     hist_dfs: Dict[int, pd.DataFrame],
     window_size: int,
@@ -231,7 +228,6 @@ def plot_individual_rewards(
         axs_flat[i].set_visible(False)
 
     plt.tight_layout()
-    plt.show()
     return fig
 
 
@@ -301,7 +297,6 @@ def plot_pairwise_comparison(
     ax_pval.set_xlabel("Config Group Index")
     ax_pval.set_ylabel("Config Group Index")
     plt.tight_layout()
-    plt.show()
 
     # Plot difference of means
     fig_diff, ax_diff = plt.subplots(figsize=(7, 6))
@@ -340,7 +335,6 @@ def plot_pairwise_comparison(
     ax_diff.set_xlabel("Config Group Index (Col)")
     ax_diff.set_ylabel("Config Group Index (Row)")
     plt.tight_layout()
-    plt.show()
     return fig_pval, fig_diff
 
 
@@ -460,7 +454,6 @@ def plot_independent_variable_analysis(
     ax_pval.set_xlabel(independent_var)
     ax_pval.set_ylabel(independent_var)
     plt.tight_layout()
-    plt.show()
 
     # Plot difference of means
     fig_diff, ax_diff = plt.subplots(figsize=(7, 6))
@@ -500,7 +493,6 @@ def plot_independent_variable_analysis(
     ax_diff.set_xlabel(f"{independent_var} (Col)")
     ax_diff.set_ylabel(f"{independent_var} (Row)")
     plt.tight_layout()
-    plt.show()
     return fig_pval, fig_diff
 
 
@@ -534,7 +526,6 @@ def plot_learning_rate_comparison(analysis_df: pd.DataFrame, window_size: int):
     ax.set_ylabel("Final Reward (Avg. over last episodes)")
     ax.legend(title="Critic Learning Rate")
     plt.tight_layout()
-    plt.show()
     return fig
 
 
@@ -644,18 +635,7 @@ def main(
 
 
 if __name__ == "__main__":
-    # Example usage: Analyze the ANT_CONFIGS
-    # You can easily swap ANT_CONFIGS with another list of RunConfig objects
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     main(configs_to_analyze=PENDULUM_CONFIGS, env_name="pendulum")
     main(configs_to_analyze=INVERTED_PENDULUM_CONFIGS, env_name="inverted_pendulum")
     main(configs_to_analyze=ANT_CONFIGS, env_name="ant")
-
-    # Example: Analyze only the first 10 configs with a different window size
-    # print("\n\n--- Analyzing first 10 configs with window size 10 ---")
-    # main(configs_to_analyze=ANT_CONFIGS[:10], window_size=10, seeds_per_config=?) # Need correct seeds_per_config if different
-
-    # Example: Analyze based on a different independent variable
-    # print(f"\n\n--- Analyzing {ANT_CONFIGS} with independent variable 'critic_lr' ---")
-    # main(configs_to_analyze=ANT_CONFIGS, independent_var="critic_lr")
-
-# %%

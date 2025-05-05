@@ -39,7 +39,7 @@ python src/main.py
 ## Directory Structure
 
 ```
-p1/
+/
 ├── data/
 │   ├── 01_results/     # csvs containing the final reward and length of each episode
 │   ├── (02_videos)/    # Intermediate episode videos, generated during training
@@ -48,6 +48,7 @@ p1/
 ├── notebooks/          # Jupyter notebooks for exploration, analysis, or visualization
 │   ├── list_configs.py # Notebook for listing all available configurations in configs.csv
 │   ├── plot_rewards.py # Notebook for plotting the rewards of each episode
+│   ├── plot_rewards_script.py # Script version of plot_rewardspy
 │   └── stats_demo.py   # Notebook for practicing t-tests
 ├── src/                # Source code for the project
 │   ├── agent/              # Agent classes

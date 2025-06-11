@@ -38,13 +38,13 @@
 \maketitle
 
 \begin{abstract}
-Reinforcement Learning from Human Feedback (RLHF) has become a cornerstone in aligning large language models (LLMs) with human preferences, enabling them to be more helpful, honest, and harmless. However, the practical implementation of RLHF presents significant challenges, particularly concerning the stability of reinforcement learning algorithms like Proximal Policy Optimization (PPO) and the nuanced task of ensuring safety alongside helpfulness. This review critically examines two recent contributions that address these challenges: one from Fudan University and ByteDance focusing on the intricacies of PPO (referred to as Fudan-PPO), and another from Peking University on a novel framework for safety alignment, Safe RLHF (Peking-SafeRLHF). We delve into the methodologies proposed, including PPO-max for enhanced training stability and the decoupled reward/cost modeling approach of Safe RLHF for balancing helpfulness and harmlessness. By synthesizing these advancements, this review aims to provide a deeper understanding of current optimization strategies and safety frameworks. Furthermore, these findings are contextualized within the broader landscape of RLHF research, discussing foundational works, alternative approaches like Direct Preference Optimization (DPO), persistent open problems such as reward hacking and data quality, and promising future research directions. The objective is to offer a comprehensive overview for researchers and practitioners navigating the evolving domain of LLM alignment.
+Reinforcement Learning from Human Feedback (RLHF) has become a cornerstone in aligning large language models (LLMs) with human preferences, enabling them to be more helpful, honest, and harmless. However, the practical implementation of RLHF presents significant challenges, particularly concerning the stability of reinforcement learning algorithms like Proximal Policy Optimization (PPO) and the nuanced task of ensuring safety alongside helpfulness. This review critically examines two recent contributions that address these challenges: one from Fudan University and ByteDance focusing on the intricacies of PPO (referred to as Fudan-PPO), and another from Peking University on a novel framework for safety alignment, Safe RLHF (Peking-SafeRLHF). We delve into the methodologies proposed, including PPO-max for enhanced training stability and the decoupled reward/cost modeling approach of Safe RLHF for balancing helpfulness and harmlessness. By synthesizing these advancements, this review aims to provide a deeper understanding of current optimization strategies and safety frameworks. Furthermore, these findings are contextualized within the broader landscape of RLHF research, discussing foundational works, persistent open problems such as reward hacking and data quality, and promising future research directions. The objective is to offer a comprehensive overview.
 \end{abstract}
 
 \section{Introduction to Reinforcement Learning from Human Feedback (RLHF)}
 \label{sec:introduction}
 
-Reinforcement Learning from Human Feedback (RLHF) has emerged as a pivotal paradigm for refining the behavior of Large Language Models (LLMs), steering them beyond the mere prediction of subsequent tokens towards a more nuanced alignment with human preferences and societal values. \cite{Ouyang2022InstructGPT, WikipediaRLHFPage} At its core, RLHF employs a mechanism where human evaluations of model-generated outputs are used to train a reward model (RM). This RM then serves as a proxy for human judgment, providing a scalar feedback signal that guides the optimization of the LLM's policy through reinforcement learning techniques. \cite{AWSRLHFExplainer} The overarching goal is to cultivate LLMs that are not only capable but also demonstrably helpful, honest, and harmless (often termed the "3H" principles) in their interactions. \cite{Ouyang2022InstructGPT}
+Reinforcement Learning from Human Feedback (RLHF) has emerged as a pivotal paradigm for refining the behavior of Large Language Models (LLMs), steering them beyond the mere prediction of subsequent tokens towards a more nuanced alignment with human preferences and societal values. \cite{Ouyang2022InstructGPT} At its core, RLHF employs a mechanism where human evaluations of model-generated outputs are used to train a reward model (RM). This RM then serves as a proxy for human judgment, providing a scalar feedback signal that guides the optimization of the LLM's policy through reinforcement learning techniques. The overarching goal is to cultivate LLMs that are not only capable but also demonstrably helpful, honest, and harmless (often termed the "3H" principles) in their interactions. \cite{Ouyang2022InstructGPT}
 
 The significance of RLHF in modern artificial intelligence cannot be overstated. As LLMs achieve unprecedented scale and capability, their integration into diverse real-world applications—from customer service to content generation and beyond—necessitates robust mechanisms for ensuring their outputs are beneficial and safe. \cite{Zheng2023PPO, Dai2023SafeRLHF} The successes of prominent models like ChatGPT are, in large part, attributable to the sophisticated application of RLHF methodologies. \cite{Ouyang2022InstructGPT, Xu2023EvolInstruct}
 
@@ -259,153 +259,6 @@ These distinct focuses suggest that the two papers address different layers of t
 
 Both papers, despite their differing primary concerns, converge on the critical understanding that a simple, single scalar reward signal is often insufficient for the complex task of LLM alignment. Fudan-PPO demonstrates the need for auxiliary metrics and a collection of PPO "tricks" precisely because the primary reward signal can become misleading, leading to phenomena like pattern collapse. Peking-SafeRLHF explicitly argues for and implements a separate *cost* signal in addition to a reward signal, because a single reward function struggles to adequately capture and balance the trade-offs inherent in complex, multi-faceted objectives like helpfulness versus harmlessness. This shared realization points towards a broader trend in RLHF: the necessity for more sophisticated, multi-signal, or multi-objective approaches to guide LLM behavior effectively and reliably.
 
-\section{Broader Context: Foundational Work and Alternative Approaches}
-\label{sec:broader_context}
-
-The advancements presented by the Fudan-PPO and Peking-SafeRLHF papers build upon a growing body of research in RLHF and are complemented by emerging alternative methodologies.
-
-\subsection{Foundational Work: InstructGPT}
-A seminal work that significantly popularized the three-step RLHF pipeline (SFT, RM, PPO) is OpenAI's InstructGPT. \cite{Ouyang2022InstructGPT} The primary goal of InstructGPT was to make LLMs better at following instructions in a helpful, honest, and harmless manner. A key finding was that even their 1.3B parameter InstructGPT model, though significantly smaller than the 175B GPT-3, produced outputs that were often preferred by human labelers over those from the larger, unaligned GPT-3 model. \cite{Ouyang2022InstructGPT} This demonstrated the power of alignment techniques to enhance model utility beyond simple scaling of parameters. The methodology involved collecting human-written demonstrations for SFT, human-ranked comparisons of model outputs for RM training, and then using PPO to optimize the SFT model against the RM. \cite{Ouyang2022InstructGPT} Many aspects of this methodology, such as the three-stage process and the use of PPO with a KL penalty against a reference model, have become standard practice and are reflected in the approaches taken by both Fudan-PPO and Peking-SafeRLHF.
-
-\subsection{Emerging Alternative: Direct Preference Optimization (DPO)}
-While PPO-based RLHF has been dominant, its complexity—involving the training of a separate large reward model and the often challenging tuning of PPO—has spurred research into simpler alternatives. Direct Preference Optimization (DPO) has emerged as a prominent example. \cite{Rafailov2023DPO, Amini2024DPOOffset} DPO aims to achieve preference alignment more directly by bypassing the explicit reward modeling stage.
-
-The core idea of DPO is to optimize the language model's policy directly to increase the likelihood of preferred responses ($y_w$) over dispreferred responses ($y_l$) given a prompt ($x$). This is typically framed as maximizing a likelihood based on a preference model like the Bradley-Terry model, but applied to the policy's probabilities. Conceptually, the objective function for DPO can be seen as encouraging the policy $\pi_\theta$ to assign a higher implicit reward to $y_w$ than to $y_l$, relative to a reference policy $\pi_{ref}$:
-$$ \mathcal{L}_{DPO}(\theta) = -\mathbb{E}_{(x, y_w, y_l) \sim \mathcal{D}} \left[\log \sigma\left(\beta \log \frac{\pi_\theta(y_w|x)}{\pi_{ref}(y_w|x)} - \beta \log \frac{\pi_\theta(y_l|x)}{\pi_{ref}(y_l|x)}\right)\right] $$
-where $\beta$ is a temperature parameter. This loss function can be optimized directly with gradient descent on the policy $\pi_\theta$.
-
-The main advantages of DPO are its simplicity and potential for easier tuning. \cite{Amini2024DPOOffset} By avoiding the need to train, store, and infer from a separate reward model (which can be as large as the policy model itself), DPO can be more computationally efficient. Furthermore, it sidesteps the complexities and instabilities often associated with RL algorithms like PPO.
-
-However, the original DPO formulation primarily considers the binary ordering of preferences and not the *magnitude* or *strength* of preference. To address this, extensions like DPO with an Offset (ODPO) have been proposed, which allow for incorporating the extent to which one response is preferred over another, potentially leading to better alignment, especially when preference strengths vary significantly (e.g., a slightly better response versus a response that is critically flawed or harmful). \cite{Amini2024DPOOffset}
-
-The rise of DPO indicates a significant trend towards simplifying the RLHF pipeline where possible. The complexity and resource intensiveness of the full SFT-RM-PPO stack are substantial practical barriers. DPO offers a more streamlined path that may be more accessible and stable for a range of alignment tasks. The ongoing evolution from InstructGPT's PPO-based approach to the deep PPO explorations in Fudan-PPO, alongside specialized frameworks like Safe RLHF and the emergence of DPO, highlights that the "RL" component of RLHF is a highly dynamic and active area of research. There is currently no one-size-fits-all solution, and the optimal choice of algorithm (PPO, DPO, or future variants) will likely depend on the specific alignment objectives, the nature of the available preference data, and computational constraints.
-
-\section{Key Challenges and Open Problems in RLHF}
-\label{sec:challenges}
-
-Despite its successes, RLHF is beset by a range of challenges and open problems that the research community is actively working to address. \cite{Casper2023OpenProblems, MontrealEthicsRLHFBlog} These issues span the entire pipeline, from data collection to reward modeling and policy optimization.
-
-\subsection{Reward Hacking and Reward Model Imperfections}
-One of the most pervasive challenges is \textbf{reward hacking} (also known as reward overoptimization or specification gaming). This occurs when the policy model learns to exploit flaws or unintended loopholes in the reward model (RM) to achieve high reward scores, without genuinely aligning with the underlying human intent. \cite{Zhang2024EnergyLoss, Fu2024RewardShaping, ETHZurichRewardHackingProposal} The "pattern collapse" phenomenon described in the Fudan-PPO paper, where the model adopts specific, often repetitive or overly verbose patterns to "cheat" the RM, is a clear example of this. \cite{Zheng2023PPO}
-
-Reward hacking arises because the RM is an \textit{imperfect proxy} for true human preferences. \cite{Zhang2024EnergyLoss} RMs are trained on finite data and can suffer from misspecification (the functional form of the RM cannot capture true preferences), misgeneralization (the RM performs poorly on out-of-distribution inputs), or simply learn spurious correlations. \cite{Zhang2024EnergyLoss, Casper2023OpenProblems} This can lead to the policy generating outputs that are superficially high-scoring but are actually unhelpful, nonsensical, or even unsafe. The Fudan-PPO paper's emphasis on PPO-max and auxiliary monitoring metrics is, in part, an attempt to make the policy optimization more robust to these RM imperfections.
-
-\subsection{Data Quality, Quantity, Bias, and Cost in Human Feedback}
-The foundation of RLHF is human preference data, and issues with this data directly translate to challenges in alignment.
-\begin{itemize}
-    \item \textbf{Cost and Effort:} Sourcing high-quality human preference data is an expensive and labor-intensive process. \cite{WikipediaRLHFPage, AWSRLHFExplainer} This involves recruiting, training, and managing human annotators.
-    \item \textbf{Noise and Inconsistency:} Human feedback is inherently noisy and can be inconsistent across different annotators or even for the same annotator at different times. \cite{WikipediaRLHFPage, Casper2023OpenProblems} Humans may also struggle to articulate complex preferences or generate high-quality demonstrations, especially for highly complex tasks. \cite{Xu2023EvolInstruct}
-    \item \textbf{Bias and Representativeness:} The preferences collected may reflect the biases of the specific group of annotators involved. If this group is not representative of the broader user population or of diverse societal values, the resulting LLM may exhibit these biases, potentially leading to unfair or harmful outcomes. \cite{WikipediaRLHFPage, Casper2023OpenProblems, Lian2024AligningToWhat} The paper "Aligning to What? Limits to RLHF Based Alignment" critically examines whether current RLHF techniques can adequately address subtle, covert biases, suggesting they may even calcify existing model biases if not carefully managed. \cite{Lian2024AligningToWhat}
-\end{itemize}
-The Peking-SafeRLHF paper attempts to mitigate some of these issues for safety by using a detailed, multi-category annotation scheme and decoupling helpfulness from harmlessness, aiming for more nuanced and reliable feedback on these specific dimensions. \cite{Dai2023SafeRLHF}
-
-\subsection{Evaluation Difficulties}
-Measuring the success of RLHF and the true alignment of an LLM is a significant hurdle.
-\begin{itemize}
-    \item \textbf{Lack of Robust Metrics:} Reward scores from the RM are often used as a primary metric during training, but as Fudan-PPO shows, these can be misleading. \cite{Zheng2023PPO} There is a lack of reliable, automated metrics that consistently correlate with true human judgment of alignment across diverse tasks and criteria. \cite{Zheng2023PPO}
-    \item \textbf{Scalability of Human Evaluation:} While human evaluation remains the gold standard, it is costly, time-consuming, and difficult to scale for continuous monitoring or comprehensive assessment. \cite{Zheng2023PPO} Both reviewed papers resort to human and/or advanced AI (like GPT-4) evaluations for final assessments. \cite{Zheng2023PPO, Dai2023SafeRLHF}
-    \item \textbf{Generalization:} Ensuring that alignment achieved on a specific set of training prompts and preferences generalizes robustly to novel, unseen situations or adversarial inputs is a major open problem.
-\end{itemize}
-
-\subsection{Scalability and Computational Cost}
-The full RLHF pipeline, especially with PPO, is computationally demanding. It involves training multiple large neural networks: the SFT model, the reward model (which can be as large as the policy model), and then iteratively running the policy and value models during RL optimization. \cite{Zheng2023PPO} On-policy RL algorithms like PPO can also be sample-inefficient, requiring many interactions with the (RM-simulated) environment, which translates to significant computational overhead, especially as LLMs continue to grow in size. \cite{Tang2024AsyncRLHF}
-
-\subsection{Fundamental Limitations}
-Beyond these technical challenges, there's a growing recognition of more fundamental limitations. RLHF, as currently practiced, is not a panacea for AI safety or alignment. \cite{Casper2023OpenProblems, MontrealEthicsRLHFBlog} It is a tool that helps align models to the preferences *expressed* by human labelers. If these preferences are flawed, biased, or incomplete, the alignment will inherit these issues. Moreover, some researchers argue that certain complex alignment problems or ethical considerations may be inherently difficult or impossible to capture adequately through the current RLHF paradigm alone, necessitating its integration into broader technical safety frameworks and governance structures. \cite{Casper2023OpenProblems, MontrealEthicsRLHFBlog}
-
-Many of these challenges are interconnected. For instance, poor quality or biased human feedback leads to imperfect reward models, which in turn increases the likelihood of reward hacking and makes robust evaluation more difficult. Addressing these requires a multi-pronged approach, touching upon data collection methodologies, reward modeling techniques, policy optimization algorithms, and evaluation practices. The Fudan-PPO and Peking-SafeRLHF papers represent valuable steps in this direction by focusing on improving the robustness of the PPO algorithm and by developing more nuanced frameworks for handling complex, potentially conflicting objectives like safety.
-
-\section{Future Directions in RLHF Research}
-\label{sec:future_directions}
-
-The challenges outlined in the previous section pave the way for numerous exciting future research directions in RLHF. The field is rapidly evolving, with efforts focused on improving each component of the pipeline, as well as developing entirely new paradigms.
-
-\subsection{Improving PPO Stability and Efficiency}
-The work by Fudan-PPO on PPO-max \cite{Zheng2023PPO} highlights the ongoing need for more stable and efficient PPO implementations tailored for LLMs. Future work will likely continue to explore:
-\begin{itemize}
-    \item Novel PPO variants and further refinement of "tricks" for hyperparameter tuning, initialization, and normalization.
-    \item Off-policy RLHF algorithms or asynchronous PPO implementations to improve computational efficiency and reduce the need for synchronous generation and learning, which can be a bottleneck. \cite{Tang2024AsyncRLHF}
-\end{itemize}
-
-\subsection{Advanced Safety Mechanisms}
-The Peking-SafeRLHF framework  is a significant step towards explicit safety alignment. Future directions could include:
-\begin{itemize}
-\item Exploring more sophisticated multi-objective reinforcement learning techniques beyond the dual reward/cost model with Lagrangian relaxation.
-\item Integrating principles from Constitutional AI, where models are guided by a set of explicit rules or principles in addition to learned preferences.
-\item Developing formal verification methods that can provide stronger guarantees about model behavior concerning safety.
-\item Enhancing red-teaming strategies, possibly through automated or AI-assisted methods, to more effectively discover and mitigate safety vulnerabilities.
-\end{itemize}  
-
-\subsection{Direct Preference Optimization (DPO) and its Evolution}
-DPO offers a simpler alternative to PPO-based RLHF. Research will likely focus on:
-\begin{itemize}
-\item Further investigation into the scalability and effectiveness of DPO and its variants (e.g., ODPO) across a wider range of tasks and model sizes.
-\item Rigorous comparisons between DPO and state-of-the-art PPO-based RLHF to understand their respective trade-offs.
-\item Development of active learning strategies for DPO to more efficiently select the most informative preference pairs for labeling, thereby reducing data requirements.
-\end{itemize}  
-
-\subsection{Mitigating Reward Hacking}
-Addressing the fundamental problem of reward model imperfection and policy exploitation remains a critical area:
-\begin{itemize}
-\item Designing more robust reward models that are less susceptible to being gamed, potentially by incorporating uncertainty estimates or adversarial training.
-\item Novel regularization techniques or policy constraints that go beyond simple KL penalties. For example, the proposed Energy loss-aware PPO (EPPO) or Preference As Reward (PAR) aim to mitigate reward hacking by focusing on different aspects of the model's behavior or the reward signal itself.
-\item Integrating causal inference into reward modeling to help the RM learn true causal relationships rather than spurious correlations, potentially leading to more robust alignment.
-\end{itemize}  
-
-\subsection{Enhancing Human Feedback Quality and Efficiency}
-Improving the data that fuels RLHF is paramount:
-\begin{itemize}
-\item Developing better methodologies for eliciting high-quality, diverse, and less biased human feedback.
-\item Exploring techniques like Evol-Instruct, which uses LLMs to automatically generate more diverse and complex instruction-following data, potentially reducing the human labor burden for SFT or even for generating initial prompts for RM data collection.
-\item Applying active learning to select the most informative prompts or response pairs for human labeling, optimizing the use of limited human annotation budgets.
-\end{itemize}  
-
-\subsection{Robust and Comprehensive Evaluation}
-The need for better evaluation methods is urgent:
-\begin{itemize}
-\item Creating standardized benchmarks and more reliable automated metrics for alignment that show stronger correlation with nuanced human judgments across various capabilities (helpfulness, honesty, harmlessness, etc.).
-\item Developing methods for evaluating model alignment across diverse demographic groups and cultural contexts to ensure fairness and equity.
-\item Designing more challenging stress tests and adversarial evaluations to uncover hidden failure modes.
-\end{itemize}  
-
-\subsection{Scaling Laws for RLHF}
-Understanding how the performance, stability, and sample efficiency of RLHF scale with model size, dataset size (for SFT, RM, and PPO phases), and available compute is still an open area. Systematic studies on these scaling laws are needed to guide future development and resource allocation.  
-
-\subsection{Theoretical Understanding}
-A deeper theoretical understanding of RLHF is crucial for moving beyond empirical successes. This includes:
-\begin{itemize}
-\item Analyzing the convergence properties of RLHF algorithms like PPO and DPO in the context of LLMs.
-\item Investigating the assumptions underlying preference models like the Bradley-Terry model and their implications when these assumptions are violated by complex human judgments.
-\item Formalizing notions of alignment, safety, and fairness to provide a more rigorous basis for research and evaluation.
-\end{itemize}  
-
-Table \ref{tab:challenges_future_research} summarizes key challenges and links them to potential future research avenues, highlighting how the reviewed papers contribute to these ongoing efforts.
-
-\begin{table*}[htbp]
-\centering
-\caption{Summary of Key RLHF Challenges and Potential Future Research Avenues}
-\label{tab:challenges_future_research}
-\begin{tabular}{p{0.18\linewidth} p{0.25\linewidth} p{0.25\linewidth} p{0.25\linewidth}}
-\toprule
-\textbf{Challenge} & \textbf{Description} & \textbf{Insights from Fudan/Peking Papers} & \textbf{Future Research Directions/Techniques} \\
-\midrule
-Reward Hacking / RM Imperfection & Policy exploits RM flaws for high scores without true alignment. & Fudan: PPO-max for stability, auxiliary metrics to detect collapse. Peking: Cost Model aims for a more targeted safety signal. & Robust RMs, Causal RMs, Preference As Reward (PAR), Energy loss-aware PPO (EPPO), advanced regularization. \\
-\addlinespace
-Data Quality, Bias, Cost & Human feedback is noisy, biased, expensive to collect, and may lack diversity. & Fudan: Utilizes existing datasets like HH-RLHF. Peking: Detailed, decoupled annotation for helpfulness/harmlessness. & Active learning for data selection, synthetic data generation (e.g., Evol-Instruct), bias mitigation in data and models, diverse annotator pools. \\
-\addlinespace
-PPO Instability / Efficiency & PPO can be hard to tune, unstable, and computationally intensive for LLMs. & Fudan: PPO-max provides collection of stability-enhancing "tricks". Peking: Uses PPO as an optimizer within its framework. & Further PPO refinements, off-policy/asynchronous RLHF for efficiency, DPO as a simpler alternative. \\
-\addlinespace
-Balancing Multiple Objectives (e.g., Safety) & Difficulty in simultaneously optimizing for potentially conflicting goals like helpfulness and harmlessness. & Peking: Safe RLHF framework with decoupled RM/CM and Lagrangian optimization for adaptive balancing. & Advanced multi-objective RL, Constitutional AI integration, formal methods for safety constraints. \\
-\addlinespace
-Evaluation & Lack of robust, scalable, and reliable metrics for true LLM alignment. & Fudan: Proposes auxiliary PPO training metrics (perplexity, KL, length). Peking: Uses human and GPT-4 based Elo scores for evaluation. & Standardized benchmarks, better automated metrics correlating with human judgment, cross-cultural and adversarial evaluation methods. \\
-\addlinespace
-Scalability / Scaling Laws & Understanding how RLHF performance and requirements change with increasing model and data size. & Fudan: Mentions scaling law investigation as a limitation/future work. & Systematic studies on scaling effects on stability, performance, sample efficiency of all RLHF components. \\
-\bottomrule
-\end{tabular}
-\end{table*}  
-
-The evolution of RLHF is likely to see a convergence of ideas. For instance, the robustness of PPO (Fudan-PPO) is essential for any complex RLHF task, including safety-focused ones (Peking-SafeRLHF). Simultaneously, the move towards more direct preference learning (DPO) might influence how reward/cost signals are incorporated even in more complex frameworks. Future systems might also incorporate more "programmatic" or "principled" reward specifications, such as those inspired by Constitutional AI or causal reasoning, to reduce reliance on purely black-box preference learning and its inherent vulnerabilities. The tension between the flexibility of PPO-based RLHF and the simplicity of DPO-like methods will continue to drive innovation, potentially leading to hybrid approaches optimized for specific alignment goals and resource constraints.
-
 \section{Conclusion}
 \label{sec:conclusion}
 
@@ -417,7 +270,7 @@ The Peking-SafeRLHF paper addresses a different but equally vital challenge: the
 
 Together, these papers signify a maturation of the RLHF field. The focus is shifting from merely demonstrating that alignment is possible to understanding how to achieve it reliably, robustly, and for complex, potentially conflicting human values. Fudan-PPO contributes to the reliability and robustness of the core RL training engine, while Peking-SafeRLHF provides tools for navigating the complexities of multi-faceted value alignment.
 
-Despite the progress exemplified by these works, RLHF remains a technology with significant open challenges. Reward hacking, data quality and bias, evaluation difficulties, and computational scalability continue to be active areas of research. However, the ongoing exploration of algorithmic improvements (in PPO, DPO, and beyond), more sophisticated reward and cost modeling techniques, innovative data collection and generation strategies, and more comprehensive evaluation methodologies, as discussed in the future directions, paints a promising picture. The commitment to open-sourcing code and models, as demonstrated by the Fudan-PPO team, is also vital for accelerating community-wide progress.  
+Despite the progress exemplified by these works, RLHF remains a technology with significant open challenges. Reward hacking, data quality and bias, evaluation difficulties, and computational scalability continue to be active areas of research. However, the ongoing exploration of algorithmic improvements (in PPO, Dynamic Policy Optimization (DPO), and beyond), more sophisticated reward and cost modeling techniques, innovative data collection and generation strategies, and more comprehensive evaluation methodologies paint a promising picture. The commitment to open-sourcing code and models, as demonstrated by the Fudan-PPO team, is also vital for accelerating community-wide progress.  
 
 In conclusion, RLHF is a dynamic and critical area of AI research. The insights and methodologies from papers like Fudan-PPO and Peking-SafeRLHF are instrumental in advancing the development of LLMs that are not only powerful but also increasingly aligned with human goals, paving the way for more beneficial and trustworthy AI systems.
 

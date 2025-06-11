@@ -1,0 +1,10 @@
+*.aux
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.log
+*.out
+*.pdf
+*.synctex.gz
+*.synctex.gz(busy)

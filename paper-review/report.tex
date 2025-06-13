@@ -1,4 +1,4 @@
-\documentclass{article} % Using a common academic template style
+\documentclass{article}
 
 \usepackage[utf8]{inputenc}
 \usepackage[margin=2.5cm]{geometry}
@@ -6,19 +6,11 @@
 \usepackage{amssymb}
 \usepackage{graphicx}
 \usepackage{url}
-\usepackage{booktabs} % For better table rules
-\usepackage{multirow} % For multi-row cells in tables
-\usepackage{hyperref} % For clickable URLs and references
-\hypersetup{
-    colorlinks=true,
-    linkcolor=blue,
-    filecolor=magenta,
-    urlcolor=cyan,
-    citecolor=green,
-}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{hyperref}
 
-
-\title{Advancements in Reinforcement Learning from Human Feedback: Stability, Safety, and Future Trajectories}
+\title{Advancements in Reinforcement Learning from Human Feedback: Stability, Safety, and Beyond}
 \author{Zachary Parent}
 
 \date{\today}
@@ -28,7 +20,7 @@
 \maketitle
 
 \begin{abstract}
-Reinforcement Learning from Human Feedback (RLHF) has become a cornerstone in aligning large language models (LLMs) with human preferences, enabling them to be more helpful, honest, and harmless. However, the practical implementation of RLHF presents significant challenges, particularly concerning the stability of reinforcement learning algorithms like Proximal Policy Optimization (PPO) and the nuanced task of ensuring safety alongside helpfulness. This review critically examines two recent contributions that address these challenges: one from Fudan University and ByteDance focusing on the intricacies of PPO (referred to as Fudan-PPO), and another from Peking University on a novel framework for safety alignment, Safe RLHF (Peking-SafeRLHF). We delve into the methodologies proposed, including PPO-max for enhanced training stability and the decoupled reward/cost modeling approach of Safe RLHF for balancing helpfulness and harmlessness. By synthesizing these advancements, this review aims to provide a deeper understanding of current optimization strategies and safety frameworks. Furthermore, these findings are contextualized within the broader landscape of RLHF research, discussing foundational works, persistent open problems such as reward hacking and data quality, and promising future research directions.
+Reinforcement Learning from Human Feedback (RLHF) has become a cornerstone in aligning large language models (LLMs) with human preferences, enabling them to be more helpful, honest, and harmless. However, the practical implementation of RLHF presents significant challenges, particularly concerning the stability of reinforcement learning algorithms like Proximal Policy Optimization (PPO) and the nuanced task of ensuring safety alongside helpfulness. This review critically examines two recent contributions that address these challenges: one from Fudan University and ByteDance focusing on the intricacies of PPO (referred to as Fudan-PPO), and another from Peking University on a novel framework for safety alignment, Safe RLHF (Peking-SafeRLHF). I delve into the methodologies proposed, including PPO-max for enhanced training stability and the decoupled reward/cost modeling approach of Safe RLHF for balancing helpfulness and harmlessness. By synthesizing these advancements, this review aims to provide a deeper understanding of current optimization strategies and safety frameworks. Furthermore, these findings are contextualized within the broader landscape of RLHF research, discussing foundational works, persistent open problems such as reward hacking and data quality, and future research directions.
 \end{abstract}
 
 \section{Introduction to Reinforcement Learning from Human Feedback (RLHF)}
@@ -47,10 +39,10 @@ This review aims to synthesize these recent advancements in RLHF, as exemplified
 \section{The Standard RLHF Pipeline: Foundations and Components}
 \label{sec:standard_rlhf}
 
-The RLHF process, as widely adopted and described in seminal works like InstructGPT \cite{Ouyang2022InstructGPT} and reiterated in the foundational sections of both the Fudan-PPO \cite{Zheng2023PPO} and Peking-SafeRLHF \cite{Dai2023SafeRLHF} papers, typically unfolds in three distinct stages: \textbf{Supervised Fine-Tuning (SFT)}, \textbf{Reward Modeling (RM)}, and \textbf{Reinforcement Learning (RL)} policy optimization, commonly using Proximal Policy Optimization (PPO).
+The RLHF process, as widely adopted and described in seminal works like InstructGPT \cite{Ouyang2022InstructGPT} and reiterated in the foundational sections of both the Fudan-PPO \cite{Zheng2023PPO} and Peking-SafeRLHF \cite{Dai2023SafeRLHF} papers, typically unfolds in three distinct stages: \textbf{Supervised Fine-Tuning (SFT)}, \textbf{Reward Modeling (RM)}, and \textbf{Reinforcement Learning (RL)} policy optimization, commonly using Proximal Policy Optimization (PPO). These steps are contextualized later on in Figure \ref{fig:ppo_workflow_fudan}.
 
 \subsection{Supervised Fine-Tuning (SFT)}
-The initial stage, SFT, aims to adapt a general pre-trained LLM to better follow instructions and generate responses in a style amenable to human interaction. This is achieved by fine-tuning the pre-trained model on a curated dataset of high-quality prompt-response pairs. These pairs are often crafted or demonstrated by human labelers, providing examples of desired behavior. \cite{Ouyang2022InstructGPT} The Fudan-PPO paper underscores the critical role of SFT, noting that a policy model initialized directly from a pre-trained model without SFT is "clearly incapable in PPO training". \cite{Zheng2023PPO} This implies that SFT does more than just teach instruction-following; it conditions the model into a state that is more receptive and stable for the subsequent preference learning stages. The quality, diversity, and inherent biases of the SFT dataset can therefore have a profound and lasting impact on the entire RLHF pipeline, shaping the model's baseline behavior before any explicit preference optimization occurs.
+The initial stage, SFT, aims to adapt a general pre-trained LLM to better follow instructions and generate responses in a style amenable to human interaction. This is achieved by fine-tuning the pre-trained model on a curated dataset of high-quality prompt-response pairs.  These pairs are often crafted or demonstrated by human labelers, providing examples of desired behavior. \cite{Ouyang2022InstructGPT} The Fudan-PPO paper underscores the critical role of SFT, noting that a policy model initialized directly from a pre-trained model without SFT is "clearly incapable in PPO training". \cite{Zheng2023PPO} This implies that SFT does more than just teach instruction-following; it conditions the model into a state that is more receptive and stable for the subsequent preference learning stages. The quality, diversity, and inherent biases of the SFT dataset can therefore have a profound and lasting impact on the entire RLHF pipeline, shaping the model's baseline behavior before any explicit preference optimization occurs.
 
 \subsection{Reward Modeling (RM)}
 Following SFT, the next stage involves training a reward model (RM) to act as a surrogate for human preferences. The RM learns to score LLM-generated responses based on which ones humans prefer. This process typically involves:
@@ -73,7 +65,7 @@ Proximal Policy Optimization (PPO) \cite{Zheng2023PPO, Dai2023SafeRLHF} is the m
     \label{eq:total_reward}
     r_{total}(x,y) = r_{RM}(x,y) - \eta \text{KL}(\pi_\theta^{RL}(y|x), \pi^{\text{SFT}}(y|x))
 \end{equation}
-where $r_{RM}(x,y)$ is the score from the reward model in equation \ref{eq:pairwise_loss} and $\eta$ is a coefficient controlling the strength of the KL penalty. The policy $\pi_\theta$ is then updated using PPO to maximize the expected total reward.
+where $r_{RM}(x,y)$ is the score from the reward model trained using the loss in Equation \ref{eq:pairwise_loss} and $\eta$ is a coefficient controlling the strength of the KL penalty. The policy $\pi_\theta$ is then updated using PPO to maximize the expected total reward.
 
 The successful execution of these three stages allows LLMs to produce outputs that are more closely aligned with human expectations, but each stage introduces its own set of complexities and potential pitfalls, which the Fudan-PPO and Peking-SafeRLHF papers aim to address.
 
@@ -117,7 +109,7 @@ The value function $V_\phi(s_t)$, also known as the critic, is trained concurren
     \mathcal{L}_{critic}(\phi) = \hat{\mathbb{E}}_{t} \left[ (V_\phi(s_t) - \hat{R}_t)^2 \right]
 \end{equation}
 
-As mentioned previously in equation \ref{eq:total_reward}, a KL divergence penalty term is often incorporated into the reward function to regularize the policy and prevent it from deviating too far from an initial supervised model $\pi^{SFT}$ \cite{Zheng2023PPO}:
+As mentioned previously in Equation \ref{eq:total_reward}, a KL divergence penalty term is often incorporated into the reward function to regularize the policy and prevent it from deviating too far from an initial supervised model $\pi^{SFT}$ \cite{Zheng2023PPO}:
 \begin{equation}
     \label{eq:kl_penalty}
     r_{total} = r(x,y) - \eta KL(\pi_\phi^{RL}(y|x),\pi^{SFT}(y|x))
@@ -127,11 +119,11 @@ This term serves both as an entropy bonus encouraging exploration and as a const
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.9\linewidth]{images/rlhf_overview_with_details.png}
-    \caption{Left shows an equivalent structure to the RLHF framework in Figure 1. Right shows an implementation detail list for PPO. The number with circle indicates where this strategy is used in the PPO training. The pentagram indicates the method used by PPO-max. (Adapted from Fudan-PPO Figure 5 \cite{Zheng2023PPO})}
+    \caption{Left shows the RLHF framework. Right shows an implementation detail list for PPO. The number with circle indicates where this strategy is used in the PPO training. The pentagram indicates the method used by PPO-max. (Adapted from Fudan-PPO Figure 5 \cite{Zheng2023PPO})}
     \label{fig:ppo_workflow_fudan}
   \end{figure}
 
-The overall PPO workflow is depicted in Figure \ref{fig:ppo_workflow_fudan}. The process begins with sampling trajectories from the environment using the current policy. These trajectories are then used to compute rewards (often including the KL penalty) and advantage estimates via GAE. Subsequently, the policy and value functions are updated using their respective loss functions. This iterative process aims to gradually improve the policy's ability to generate high-reward responses. The coordination of these components—the SFT model for initialization and as a reference, the reward model for feedback, the policy model being optimized, and the value model for advantage estimation—is a complex orchestration.
+The overall PPO workflow is depicted in Figure \ref{fig:ppo_workflow_fudan}. The process begins with sampling trajectories from the environment using the current policy. These trajectories are then used to compute rewards (often including the KL penalty) and advantage estimates via GAE. Subsequently, the policy and value functions are updated using their respective loss functions. This iterative process aims to gradually improve the policy's ability to generate high-reward responses. The coordination of these components --- the SFT model for initialization and as a reference, the reward model for feedback, the policy model being optimized, and the value model for advantage estimation --- is a complex orchestration.
 
 \subsection{The "Pattern Collapse" Problem and Monitoring Metrics}
 A significant challenge identified in the Fudan-PPO paper is "pattern collapse," where "SFT models are over-optimized and exhibit highly biased behavior... [the policy model] has a tendency to cheat the reward model through specific patterns for anomalous higher scores". \cite{Zheng2023PPO} This is a specific manifestation of reward hacking \cite{Zhang2024EnergyLoss, Fu2024RewardShaping}, where the policy exploits imperfections in the RM rather than genuinely aligning with the intended human preferences. The paper argues that standard metrics like reward scores and training losses can be misleading, as they might continue to improve even as the model's output quality (from a human perspective) degrades. \cite{Zheng2023PPO}
@@ -207,7 +199,7 @@ Based on these decoupled datasets, Safe RLHF trains two independent preference m
                          + \log\sigma(s_l C_{\psi}(y_l,x))]
     \end{split}
     \end{equation}
-    (Adapted from Eq. 6 \cite{Dai2023SafeRLHF}). The Cost Model is designed such that $C_\psi(y,x) > 0$ for responses deemed harmful and $C_\psi(y,x) < 0$ for harmless ones. This allows the CM to effectively separate responses based on their safety.
+    (Adapted from Eq. 6 \cite{Dai2023SafeRLHF}). The Cost Model is designed such that $C_\psi(y,x) > 0$ for responses deemed harmful and $C_\psi(y,x) < 0$ for harmless ones. This allows the Cost Model to effectively separate responses based on their safety.
 \end{itemize}
 
 
@@ -277,7 +269,7 @@ Table \ref{tab:comparison_fudan_peking} provides a summarized comparison of the 
 
 These distinct focuses suggest that the two papers address different layers of the RLHF problem stack. Fudan-PPO is working at the "RL algorithm layer," aiming to make the core training engine more reliable. Peking-SafeRLHF operates at the "objective definition and safety layer," determining what the LLM should be trained for and how to manage conflicting goals. This implies a potential for interplay: the PPO-max techniques for stable PPO training from Fudan-PPO could be directly integrated into the policy optimization step of the Peking-SafeRLHF framework. For example, when optimizing the Lagrangian objective in Safe RLHF (e.g., Eq. 29, 30 in \cite{Dai2023SafeRLHF}), the underlying PPO algorithm could benefit significantly from PPO-max's stability enhancements, such as advanced normalization, clipping strategies, and critic pre-training. Furthermore, the detailed monitoring metrics proposed by Fudan-PPO (perplexity, KL divergence, response length) could be invaluable for tracking policy behavior within the Safe RLHF loop, offering insights beyond just the aggregate reward and cost scores and potentially detecting subtle forms of gaming or instability earlier.
 
-Both papers, despite their differing primary concerns, converge on the critical understanding that a simple, single scalar reward signal is often insufficient for the complex task of LLM alignment. Fudan-PPO demonstrates the need for auxiliary metrics and a collection of PPO "tricks" precisely because the primary reward signal can become misleading, leading to phenomena like pattern collapse. Peking-SafeRLHF explicitly argues for and implements a separate *cost* signal in addition to a reward signal, because a single reward function struggles to adequately capture and balance the trade-offs inherent in complex, multi-faceted objectives like helpfulness versus harmlessness. This shared realization points towards a broader trend in RLHF: the necessity for more sophisticated, multi-signal, or multi-objective approaches to guide LLM behavior effectively and reliably.
+Both papers, despite their differing primary concerns, converge on the critical understanding that a simple, single scalar reward signal is often insufficient for the complex task of LLM alignment. Fudan-PPO demonstrates the need for auxiliary metrics and a collection of PPO "tricks" precisely because the primary reward signal can become misleading, leading to phenomena like pattern collapse. Peking-SafeRLHF explicitly argues for and implements a separate \textit{cost} signal in addition to a reward signal, because a single reward function struggles to adequately capture and balance the trade-offs inherent in complex, multi-faceted objectives like helpfulness versus harmlessness. This shared realization points towards a broader trend in RLHF: the necessity for more sophisticated, multi-signal, or multi-objective approaches to guide LLM behavior effectively and reliably.
 
 \section{Conclusion}
 \label{sec:conclusion}
@@ -286,7 +278,7 @@ Reinforcement Learning from Human Feedback has undeniably transformed the landsc
 
 The Fudan-PPO paper illuminates the often-overlooked "secrets" within PPO implementation, demonstrating that careful engineering, including strategies for score reparameterization, policy constraints, and appropriate initialization (collectively termed PPO-max), is critical for overcoming instability and issues like pattern collapse. Their work underscores that success in RLHF is not just about the core algorithms but also about the practical wisdom gained through empirical investigation and the development of insightful monitoring metrics.
 
-The Peking-SafeRLHF paper addresses a different but equally vital challenge: the inherent tension between desirable LLM behaviors, particularly helpfulness and harmlessness. By proposing a framework that decouples human preferences for these aspects, trains separate Reward and Cost Models, and employs a Lagrangian-based constrained optimization, they offer a more principled and adaptive approach to safety alignment. Their iterative methodology, incorporating red-teaming, further highlights that achieving robust safety is an ongoing process of discovery and refinement.
+The Peking-SafeRLHF paper addresses a different but equally important challenge: the inherent tension between desirable LLM behaviors, particularly helpfulness and harmlessness. By proposing a framework that decouples human preferences for these aspects, trains separate Reward and Cost Models, and employs a Lagrangian-based constrained optimization, they offer a more principled and adaptive approach to safety alignment. Their iterative methodology, incorporating red-teaming, further highlights that achieving robust safety is an ongoing process of discovery and refinement.
 
 Together, these papers signify a maturation of the RLHF field. The focus is shifting from merely demonstrating that alignment is possible to understanding how to achieve it reliably, robustly, and for complex, potentially conflicting human values. Fudan-PPO contributes to the reliability and robustness of the core RL training engine, while Peking-SafeRLHF provides tools for navigating the complexities of multi-faceted value alignment.
 

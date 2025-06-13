@@ -10,7 +10,11 @@
 \usepackage{multirow}
 \usepackage{hyperref}
 
-\title{Advancements in Reinforcement Learning from Human Feedback: Stability, Safety, and Beyond}
+\title{
+    \rule{\textwidth}{2pt}
+    Advancements in Reinforcement Learning from Human Feedback: Stability, Safety, and Beyond
+    \rule{\textwidth}{1pt}
+}
 \author{Zachary Parent}
 
 \date{\today}
@@ -174,7 +178,7 @@ The core innovation of Safe RLHF is the explicit decoupling of human preferences
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.9\linewidth]{images/safe_rlhf_process.png}
+    \includegraphics[width=\linewidth]{images/safe_rlhf_process.png}
     \caption{Safe RLHF pipeline compared to conventional RLHF method. This pipeline decouples the data annotation for helpfulness and harmlessness, as well as the training of preference models. Ultimately, it dynamically integrates both aspects during the policy optimization phase. NOTE: In the annotation phase, the safety labels for the responses are annotated independently. These responses can be labeled as both safe or both unsafe (Adapted from Peking-SafeRLHF Figure 1 \cite{Dai2023SafeRLHF})}
     \label{fig:safe_rlhf_pipeline_peking}
 \end{figure}
@@ -245,27 +249,30 @@ Regarding the reward and preference mechanism, Fudan-PPO operates under the assu
 
 Safety integration also differs. Fudan-PPO addresses safety more implicitly; by training on datasets like HH-RLHF for the reward model \cite{Zheng2023PPO} and by achieving stable PPO training, the expectation is that good general alignment will lead to safer behavior. Peking-SafeRLHF, however, makes safety an explicit, first-class concern, modeling and constraining harmlessness as a primary objective through its Cost Model and constrained optimization formulation.
 
-Despite these differences, both papers acknowledge common underlying challenges. The difficulty of accurate reward modeling is a shared concern: Fudan-PPO states "the quality of the reward model directly determines the upper bound of the policy model" \cite{Zheng2023PPO}, while Peking-SafeRLHF's framework relies on the accuracy of both its Reward and Cost models. Both are also fundamentally concerned with training stability and effective policy optimization, though Fudan-PPO focuses more on PPO's internal algorithmic stability, and Peking-SafeRLHF on the stability of balancing conflicting high-level objectives.
+Despite these differences, both papers acknowledge common underlying challenges. The difficulty of accurate reward modeling is a shared concern: Fudan-PPO states "the quality of the reward model directly determines the upper bound of the policy model" \cite{Zheng2023PPO}, while Peking-SafeRLHF's framework relies on the accuracy of both its Reward and Cost models. Both are also fundamentally concerned with training stability and effective policy optimization, though Fudan-PPO focuses more on PPO's internal algorithmic stability, and Peking-SafeRLHF on the stability of balancing conflicting high-level objectives. Table \ref{tab:comparison_fudan_peking} provides a summarized comparison of the two approaches.
 
-Table \ref{tab:comparison_fudan_peking} provides a summarized comparison of the two approaches.
-
-\begin{table*}[htbp]
+\begin{table}[htbp]
   \centering
   \caption{Comparison of PPO-max (Fudan-PPO) and Safe RLHF (Peking-SafeRLHF) Approaches}
   \label{tab:comparison_fudan_peking}
   \begin{tabular}{p{0.2\linewidth} p{0.35\linewidth} p{0.35\linewidth}}
     \toprule
     \textbf{Feature} & \textbf{PPO-max (Fudan-PPO) \cite{Zheng2023PPO}} & \textbf{Safe RLHF (Peking-SafeRLHF) \cite{Dai2023SafeRLHF}} \\
-    \midrule
+    \toprule
     \textbf{Primary Goal} & Stable and effective PPO training for general LLM alignment. & Robustly balancing helpfulness and harmlessness in LLMs. \\
+    \midrule
     \textbf{Key Innovation} & PPO-max: a collection of carefully calibrated PPO implementation "tricks" and best practices for stability. & Decoupled preference models (Reward Model for helpfulness, Cost Model for harmlessness) and Lagrangian-based constrained optimization. \\
+    \midrule
     \textbf{PPO Handling} & Deep optimization of PPO components, hyperparameters, and monitoring metrics to prevent issues like pattern collapse. & Uses PPO as the RL optimization algorithm within its constrained multi-objective framework. \\
+    \midrule
     \textbf{Reward/Preference Mechanism} & Assumes a standard single Reward Model capturing overall human preference. & Employs separate Reward Model (for helpfulness) and Cost Model (for harmlessness) based on decoupled human annotations. \\
+    \midrule
     \textbf{Safety Integration} & Implicitly through general alignment goals and training Reward Models on datasets containing safety preferences (e.g., HH-RLHF). & Explicitly models and constrains harmlessness as a primary objective using the Cost Model and a safety threshold in the optimization. \\
+    \midrule
     \textbf{Main Challenges Addressed} & PPO instability, pattern collapse, sensitivity to hyperparameters, difficulty in monitoring RLHF training. & Inherent tension between helpfulness and harmlessness, achieving quantifiable safety guarantees, avoiding catastrophic safety failures. \\
     \bottomrule
   \end{tabular}
-\end{table*}
+\end{table}
 
 These distinct focuses suggest that the two papers address different layers of the RLHF problem stack. Fudan-PPO is working at the "RL algorithm layer," aiming to make the core training engine more reliable. Peking-SafeRLHF operates at the "objective definition and safety layer," determining what the LLM should be trained for and how to manage conflicting goals. This implies a potential for interplay: the PPO-max techniques for stable PPO training from Fudan-PPO could be directly integrated into the policy optimization step of the Peking-SafeRLHF framework. For example, when optimizing the Lagrangian objective in Safe RLHF (e.g., Eq. 29, 30 in \cite{Dai2023SafeRLHF}), the underlying PPO algorithm could benefit significantly from PPO-max's stability enhancements, such as advanced normalization, clipping strategies, and critic pre-training. Furthermore, the detailed monitoring metrics proposed by Fudan-PPO (perplexity, KL divergence, response length) could be invaluable for tracking policy behavior within the Safe RLHF loop, offering insights beyond just the aggregate reward and cost scores and potentially detecting subtle forms of gaming or instability earlier.
 
